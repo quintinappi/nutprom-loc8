@@ -1,12 +1,17 @@
-import { createClient } from '@supabase/supabase-js';
+// This is a temporary fix to prevent import errors
+// while the application transitions to using Firebase
+export const supabase = {
+  auth: {
+    onAuthStateChange: () => {},
+    getSession: async () => null,
+    signOut: async () => {}
+  },
+  from: () => ({
+    select: () => Promise.resolve([]),
+    insert: () => Promise.resolve([]),
+    update: () => Promise.resolve([]),
+    delete: () => Promise.resolve([])
+  })
+};
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_PROJECT_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_API_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase environment variables');
-}
-
-export const supabase = createClient(supabaseUrl, supabaseKey);
-
-console.log('Supabase client initialized');
+console.log('Supabase client initialized with mock implementation');
