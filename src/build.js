@@ -3,15 +3,15 @@ import { build } from 'vite';
 async function buildApp() {
   try {
     console.log('Starting build process...');
-    const result = await build({
+    await build({
       configFile: 'vite.config.js',
       mode: 'development'
     });
     console.log('Build completed successfully!');
-    return result;
+    process.exit(0);
   } catch (error) {
     console.error('Build failed:', error);
-    throw error;
+    process.exit(1);
   }
 }
 
