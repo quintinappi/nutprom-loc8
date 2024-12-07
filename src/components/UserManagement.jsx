@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, where, getDocs, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { db, auth } from '../firebase/config';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import Navbar from './Navbar';
 import { useFirebaseAuth } from '../firebase/auth';
@@ -16,6 +18,9 @@ const UserManagement = ({ onUserDeleted }) => {
   const [newCode, setNewCode] = useState('');
   const { user, logout } = useFirebaseAuth();
   const [activeTab, setActiveTab] = useState('users');
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, 'users'));
@@ -48,13 +53,11 @@ const UserManagement = ({ onUserDeleted }) => {
 
   const handleCodeSave = async (userId) => {
     try {
-      // Check if code is 4 digits
       if (!/^\d{4}$/.test(newCode)) {
         toast.error('Code must be exactly 4 digits');
         return;
       }
 
-      // Check if code is already in use by another user
       const codeQuery = query(
         collection(db, 'users'), 
         where('code', '==', newCode)
@@ -92,6 +95,31 @@ const UserManagement = ({ onUserDeleted }) => {
     }
   };
 
+  const handleUpdatePassword = async () => {
+    try {
+      if (!selectedUser) {
+        toast.error('No user selected');
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        toast.error('Password must be at least 6 characters long');
+        return;
+      }
+
+      // Update password in Firebase Authentication
+      const userRecord = auth.currentUser;
+      await updatePassword(userRecord, newPassword);
+
+      setNewPassword('');
+      setIsPasswordDialogOpen(false);
+      toast.success('Password updated successfully');
+    } catch (error) {
+      console.error('Error updating password:', error);
+      toast.error('Failed to update password: ' + error.message);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <Navbar 
@@ -113,7 +141,7 @@ const UserManagement = ({ onUserDeleted }) => {
                   <TableHead>Current Role</TableHead>
                   <TableHead>Change Role</TableHead>
                   <TableHead>Code</TableHead>
-                  <TableHead>Action</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -168,13 +196,53 @@ const UserManagement = ({ onUserDeleted }) => {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(user.id)}
-                      >
-                        Delete
-                      </Button>
+                      <div className="flex gap-2">
+                        <Dialog open={isPasswordDialogOpen && selectedUser === user.id} onOpenChange={(open) => {
+                          setIsPasswordDialogOpen(open);
+                          if (!open) {
+                            setSelectedUser(null);
+                            setNewPassword('');
+                          }
+                        }}>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedUser(user.id)}
+                            >
+                              Update Password
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Update Password</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <Input
+                                  type="password"
+                                  placeholder="New Password"
+                                  value={newPassword}
+                                  onChange={(e) => setNewPassword(e.target.value)}
+                                />
+                              </div>
+                              <div className="flex justify-end gap-2">
+                                <DialogClose asChild>
+                                  <Button variant="outline">Cancel</Button>
+                                </DialogClose>
+                                <Button onClick={handleUpdatePassword}>Update</Button>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDelete(user.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
