@@ -93,7 +93,7 @@ const UserManagement = ({ onUserDeleted }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-200 flex flex-col">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
       <Navbar 
         onLogout={logout}
         activeTab={activeTab}
@@ -101,9 +101,9 @@ const UserManagement = ({ onUserDeleted }) => {
         userRole="admin"
       />
       <div className="container mx-auto p-4 flex-grow">
-        <Card className="mx-auto mt-16 mb-8 bg-white">
+        <Card className="mx-auto mt-8 bg-white shadow-sm">
           <CardHeader>
-            <CardTitle>Manage Users</CardTitle>
+            <CardTitle className="text-2xl font-bold">Manage Users</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
