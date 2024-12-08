@@ -19,8 +19,9 @@ const AuthForm = () => {
   const getReadableErrorMessage = (errorCode) => {
     console.log('Firebase error code:', errorCode);
     switch (errorCode) {
-      case 'INVALID_LOGIN_CREDENTIALS':
+      case 'auth/invalid-login-credentials':
       case 'auth/invalid-credential':
+      case 'INVALID_LOGIN_CREDENTIALS':
         return 'Invalid email or password. Please check your credentials and try again.';
       case 'auth/email-already-in-use':
         return 'An account with this email already exists.';
@@ -41,25 +42,30 @@ const AuthForm = () => {
     setIsLoading(true);
 
     try {
-      console.log('Attempting authentication...', { isSignUp, email });
+      console.log('Starting authentication process...', { isSignUp, email });
       
       if (isSignUp) {
+        console.log('Attempting to create new user...');
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         console.log('User created successfully:', userCredential.user.uid);
         
         await setDoc(doc(db, 'users', userCredential.user.uid), {
           email: email,
-          role: 'user' // Default role for new users
+          role: 'user'
         });
         
         toast.success('Account created successfully!');
       } else {
+        console.log('Attempting to sign in...');
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         console.log('User signed in successfully:', userCredential.user.uid);
         toast.success('Signed in successfully!');
       }
     } catch (error) {
       console.error('Authentication error:', error);
+      console.log('Error code:', error.code);
+      console.log('Error message:', error.message);
+      
       const errorMessage = getReadableErrorMessage(error.code);
       setError(errorMessage);
       toast.error(errorMessage);
