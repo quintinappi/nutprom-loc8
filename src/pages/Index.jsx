@@ -40,7 +40,8 @@ const ClockingAnimation = ({ isVisible, action }) => (
 );
 
 const Index = () => {
-  const { user, loading, logout, userRole } = useFirebaseAuth();
+  const { user, loading, logout } = useFirebaseAuth();
+  const [userRole, setUserRole] = useState(null);
   const [name, setName] = useState('');
   const [surname, setSurname] = useState('');
   const [profilePic, setProfilePic] = useState(null);
@@ -164,15 +165,8 @@ const Index = () => {
     }
   }, [isOnline, user]);
 
-  const handleLogout = async () => {
-    try {
-      console.log('Attempting to logout...');
-      await logout();
-      toast.success('Logged out successfully');
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast.error('Failed to logout. Please try again.');
-    }
+  const handleLogout = () => {
+    logout();
   };
 
   const handleClockAction = (action) => {
