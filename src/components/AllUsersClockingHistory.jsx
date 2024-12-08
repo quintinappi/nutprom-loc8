@@ -44,6 +44,7 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
         
         console.log('Creating query with startDate:', startDate, 'Timestamp:', Timestamp.fromDate(startDate));
         
+        // Remove the where clause that was filtering by user_id
         const q = query(
           collection(db, 'clock_entries'),
           where('timestamp', '>=', Timestamp.fromDate(startDate)),
@@ -58,7 +59,6 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
             return {
               id: doc.id,
               ...data,
-              // Ensure timestamp is properly handled
               timestamp: data.timestamp?.toDate?.() || new Date(data.timestamp)
             };
           });
