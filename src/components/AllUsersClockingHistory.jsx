@@ -38,15 +38,17 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
       console.log('Fetching shifts...');
       try {
         setLoading(true);
-        // Get start of today
+        // Get start of today using Firestore Timestamp
         const startDate = new Date();
         startDate.setHours(0, 0, 0, 0);
         
         const q = query(
           collection(db, 'clock_entries'),
-          where('timestamp', '>=', startDate.toISOString()),
+          where('timestamp', '>=', Timestamp.fromDate(startDate)),
           orderBy('timestamp', 'desc')
         );
+
+        console.log('Query created with startDate:', startDate);
 
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
           console.log('Received shifts snapshot');
