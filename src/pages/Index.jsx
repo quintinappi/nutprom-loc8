@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
-import { collection, getDocs, query, where, Timestamp, onSnapshot } from 'firebase/firestore';
 import AuthForm from '../components/AuthForm';
 import UserManagement from '../components/UserManagement';
 import TotalHoursPage from '../components/TotalHoursPage';
@@ -11,9 +10,10 @@ import MapPopup from '../components/MapPopup';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import DashboardContent from '../components/dashboard/DashboardContent';
+import NotificationsHandler from '../components/dashboard/NotificationsHandler';
+import UsersDataHandler from '../components/dashboard/UsersDataHandler';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFirebaseAuth } from '../firebase/auth';
-import { db } from '../firebase/config';
 import { toast } from 'sonner';
 
 const ClockingAnimation = ({ isVisible, action }) => (
@@ -50,44 +50,11 @@ const Index = () => {
   const [users, setUsers] = useState({});
   const [readNotifications, setReadNotifications] = useState([]);
   const [retryAttempts, setRetryAttempts] = useState(0);
-  const MAX_RETRY_ATTEMPTS = 3;
-
-  const fetchUsers = useCallback(async () => {
-    if (!isOnline) {
-      console.log('Offline: Using cached data if available');
-      return;
-    }
-
-    try {
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-      const usersData = {};
-      usersSnapshot.forEach(doc => {
-        usersData[doc.id] = { 
-          name: doc.data().name, 
-          surname: doc.data().surname,
-          email: doc.data().email,
-          avatar_url: doc.data().avatar_url
-        };
-      });
-      setUsers(usersData);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      if (retryAttempts < MAX_RETRY_ATTEMPTS) {
-        setTimeout(() => {
-          setRetryAttempts(prev => prev + 1);
-          fetchUsers();
-        }, 1000 * (retryAttempts + 1)); // Exponential backoff
-      } else {
-        toast.error('Failed to fetch users. Please check your connection.');
-      }
-    }
-  }, [isOnline, retryAttempts]);
 
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      setRetryAttempts(0); // Reset retry attempts when back online
-      fetchUsers(); // Refetch data when back online
+      setRetryAttempts(0);
     };
     const handleOffline = () => setIsOnline(false);
 
@@ -98,33 +65,7 @@ const Index = () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [fetchUsers]);
-
-  useEffect(() => {
-    if (user && userRole === 'admin') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const q = query(
-        collection(db, 'notifications'),
-        where('userId', '==', user.uid),
-        where('timestamp', '>=', Timestamp.fromDate(today)),
-        where('readAt', '==', null)
-      );
-      const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const notificationsList = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setNotifications(notificationsList);
-      });
-
-      return () => unsubscribe();
-    }
-  }, [user, userRole]);
-
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -196,6 +137,17 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gray-200 flex flex-col">
       <LoadingOverlay isLoading={isLoading} />
+      <NotificationsHandler 
+        user={user}
+        userRole={userRole}
+        setNotifications={setNotifications}
+      />
+      <UsersDataHandler 
+        isOnline={isOnline}
+        retryAttempts={retryAttempts}
+        setRetryAttempts={setRetryAttempts}
+        setUsers={setUsers}
+      />
       <Navbar 
         onLogout={logout} 
         activeTab={activeTab} 
