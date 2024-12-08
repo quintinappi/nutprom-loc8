@@ -1,30 +1,63 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
-import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getAuth } from 'firebase/auth';
+import { getMessaging, getToken } from 'firebase/messaging';
+import { toast } from 'sonner';
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
-  measurementId: "YOUR_MEASUREMENT_ID"
+  apiKey: "AIzaSyDHrxLZEtg2HDDIaGFbji9NWjeIpXNXFXo",
+  authDomain: "logger-791f8.firebaseapp.com",
+  projectId: "logger-791f8",
+  storageBucket: "logger-791f8.appspot.com",
+  messagingSenderId: "221329878830",
+  appId: "1:221329878830:web:945c6432a80a8492fe94bf",
+  measurementId: "G-M8L6ECHTV1"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Enable offline persistence
-enableIndexedDbPersistence(db)
-  .catch((err) => {
-    console.error('Firebase persistence error:', err);
+// Enable offline persistence with proper error handling
+try {
+  enableIndexedDbPersistence(db, {
+    synchronizeTabs: true
+  }).catch((err) => {
     if (err.code === 'failed-precondition') {
-      console.log('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+      console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+      toast.warning('Multiple tabs detected. Some offline features may be limited.');
     } else if (err.code === 'unimplemented') {
-      console.log('The current browser does not support persistence.');
+      console.warn('Browser doesn\'t support persistence');
+      toast.warning('Your browser doesn\'t support offline mode.');
     }
-});
+  });
+} catch (err) {
+  console.error('Error enabling persistence:', err);
+}
 
-export { app, db, auth };
+// Initialize Firebase Cloud Messaging
+let messaging = null;
+try {
+  messaging = getMessaging(app);
+} catch (err) {
+  console.warn('Firebase messaging not supported:', err);
+}
+
+// Function to get FCM token with proper error handling
+export const getFCMToken = async () => {
+  if (!messaging) return null;
+  
+  try {
+    const currentToken = await getToken(messaging, {
+      vapidKey: 'YOUR_VAPID_KEY'
+    });
+    return currentToken;
+  } catch (err) {
+    console.error('Error getting FCM token:', err);
+    return null;
+  }
+};
+
+// Export initialized services
+export { db, auth, messaging };
