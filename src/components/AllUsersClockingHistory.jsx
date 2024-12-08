@@ -24,6 +24,9 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
         });
         console.log('Users fetched:', usersData);
         setUsers(usersData);
+      }, (error) => {
+        console.error('Error fetching users:', error);
+        toast.error('Failed to fetch users data');
       });
       return unsubscribe;
     };
@@ -140,9 +143,12 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
 
   const getUserName = (userId) => {
     const user = users[userId] || {};
-    return user.name && user.surname 
-      ? `${user.name} ${user.surname}`
-      : user.email || 'Unknown User';
+    if (user.name && user.surname) {
+      return `${user.name} ${user.surname}`;
+    } else if (user.email) {
+      return user.email;
+    }
+    return 'Unknown User';
   };
 
   const formatLocation = (fullLocation) => {
