@@ -15,7 +15,6 @@ import Footer from '../components/Footer';
 import { syncClockEntries } from '../utils/offlineSync';
 import OverviewTab from '../components/dashboard/OverviewTab';
 import ShiftsTab from '../components/dashboard/ShiftsTab';
-import AllUsersTab from '../components/dashboard/AllUsersTab';
 
 const ClockingAnimation = ({ isVisible, action }) => (
   <AnimatePresence>
@@ -341,12 +340,9 @@ const Index = () => {
   const renderDashboardContent = () => {
     return (
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-8">
+        <TabsList className="grid w-full grid-cols-2 mb-8">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="shifts">Shifts & History</TabsTrigger>
-          {userRole === 'admin' && (
-            <TabsTrigger value="all-users">All Users</TabsTrigger>
-          )}
         </TabsList>
 
         <TabsContent value="overview">
@@ -379,12 +375,6 @@ const Index = () => {
             handleLocationClick={handleLocationClick}
           />
         </TabsContent>
-
-        {userRole === 'admin' && (
-          <TabsContent value="all-users">
-            <AllUsersTab handleLocationClick={handleLocationClick} />
-          </TabsContent>
-        )}
       </Tabs>
     );
   };
