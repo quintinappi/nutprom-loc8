@@ -1,31 +1,30 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import { toast } from 'sonner';
+import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDHrxLZEtg2HDDIaGFbji9NWjeIpXNXFXo",
-  authDomain: "logger-791f8.firebaseapp.com",
-  projectId: "logger-791f8",
-  storageBucket: "logger-791f8.appspot.com",
-  messagingSenderId: "221329878830",
-  appId: "1:221329878830:web:945c6432a80a8492fe94bf",
-  measurementId: "G-M8L6ECHTV1"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID",
+  measurementId: "YOUR_MEASUREMENT_ID"
 };
 
-let app;
-let auth;
-let db;
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
-try {
-  console.log('Initializing Firebase...');
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-  console.log('Firebase initialized successfully');
-} catch (error) {
-  console.error('Error initializing Firebase:', error);
-  toast.error('Error initializing application. Please refresh the page.');
-}
+// Enable offline persistence
+enableIndexedDbPersistence(db)
+  .catch((err) => {
+    console.error('Firebase persistence error:', err);
+    if (err.code === 'failed-precondition') {
+      console.log('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+    } else if (err.code === 'unimplemented') {
+      console.log('The current browser does not support persistence.');
+    }
+});
 
-export { db, auth };
+export { app, db, auth };
