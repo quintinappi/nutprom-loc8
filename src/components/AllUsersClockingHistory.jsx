@@ -37,15 +37,18 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
   useEffect(() => {
     const fetchShifts = async () => {
       console.log('Fetching shifts...');
+      // Set start date to beginning of current day in local timezone
       let startDate = new Date();
       startDate.setHours(0, 0, 0, 0);
-      console.log('Start date:', startDate.toISOString());
+      console.log('Start date:', startDate);
 
       const q = query(
         collection(db, 'clock_entries'),
         where('timestamp', '>=', startDate.toISOString()),
         orderBy('timestamp', 'desc')
       );
+
+      console.log('Querying with start date:', startDate.toISOString());
 
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
         console.log('Shifts snapshot received');
