@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
+import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import AuthForm from '../components/AuthForm';
 import UserManagement from '../components/UserManagement';
 import TotalHoursPage from '../components/TotalHoursPage';
@@ -13,7 +14,6 @@ import DashboardContent from '../components/dashboard/DashboardContent';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFirebaseAuth } from '../firebase/auth';
 import { db } from '../firebase/config';
-import { doc, getDoc, collection, getDocs, query } from 'firebase/firestore';
 import { toast } from 'sonner';
 
 const ClockingAnimation = ({ isVisible, action }) => (
