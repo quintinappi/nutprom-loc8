@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion } from "@/components/ui/accordion";
@@ -13,7 +13,7 @@ const TimePeriodTabs = ({
   formatLocation, 
   handleLocationClick 
 }) => {
-  const [activeView, setActiveView] = React.useState('today');
+  const [activeView, setActiveView] = useState('today');
 
   return (
     <Tabs defaultValue="today" className="w-full" onValueChange={setActiveView}>
@@ -28,24 +28,25 @@ const TimePeriodTabs = ({
         <TabsContent key={period} value={period}>
           <ScrollArea className="h-[600px] w-full rounded-md border">
             <Accordion type="multiple" className="w-full">
-              {sortUserEntries(shifts).map(([userId, userData]) => (
-                <UserHistoryItem
-                  key={userId}
-                  userId={userId}
-                  userData={userData}
-                  getUserName={getUserName}
-                  getUserStatus={getUserStatus}
-                  formatDuration={formatDuration}
-                  formatLocation={formatLocation}
-                  handleLocationClick={handleLocationClick}
-                />
-              ))}
+              {Object.keys(shifts).length > 0 ? (
+                sortUserEntries(shifts).map(([userId, userData]) => (
+                  <UserHistoryItem
+                    key={userId}
+                    userId={userId}
+                    userData={userData}
+                    getUserName={getUserName}
+                    getUserStatus={getUserStatus}
+                    formatDuration={formatDuration}
+                    formatLocation={formatLocation}
+                    handleLocationClick={handleLocationClick}
+                  />
+                ))
+              ) : (
+                <div className="p-4 text-center text-gray-500">
+                  No shifts found for this period
+                </div>
+              )}
             </Accordion>
-            {Object.keys(shifts).length === 0 && (
-              <div className="p-4 text-center text-gray-500">
-                No shifts found for this period
-              </div>
-            )}
           </ScrollArea>
         </TabsContent>
       ))}

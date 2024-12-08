@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, where, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { toast } from 'sonner';
 import TimePeriodTabs from './clocking-history/TimePeriodTabs';
@@ -7,15 +7,15 @@ import TimePeriodTabs from './clocking-history/TimePeriodTabs';
 const AllUsersClockingHistory = ({ onLocationClick }) => {
   const [shifts, setShifts] = useState({});
   const [users, setUsers] = useState({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch users data
     const fetchUsers = async () => {
       console.log('Fetching users...');
-      const q = query(collection(db, 'users'));
-      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      try {
+        const usersSnapshot = await getDocs(collection(db, 'users'));
         const usersData = {};
-        querySnapshot.forEach((doc) => {
+        usersSnapshot.forEach((doc) => {
           usersData[doc.id] = {
             name: doc.data().name || '',
             surname: doc.data().surname || '',
@@ -24,11 +24,10 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
         });
         console.log('Users fetched:', usersData);
         setUsers(usersData);
-      }, (error) => {
+      } catch (error) {
         console.error('Error fetching users:', error);
         toast.error('Failed to fetch users data');
-      });
-      return unsubscribe;
+      }
     };
 
     fetchUsers();
@@ -37,40 +36,42 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
   useEffect(() => {
     const fetchShifts = async () => {
       console.log('Fetching shifts...');
-      // Set start date to beginning of current day in local timezone
-      let startDate = new Date();
-      startDate.setHours(0, 0, 0, 0);
-      console.log('Start date:', startDate);
-
-      // Convert to Firestore Timestamp
-      const firestoreTimestamp = Timestamp.fromDate(startDate);
-      console.log('Firestore timestamp:', firestoreTimestamp);
-
-      const q = query(
-        collection(db, 'clock_entries'),
-        where('timestamp', '>=', firestoreTimestamp),
-        orderBy('timestamp', 'desc')
-      );
-
-      console.log('Querying with Firestore timestamp:', firestoreTimestamp);
-
-      const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        console.log('Shifts snapshot received');
-        const entries = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        console.log('Raw entries:', entries);
+      try {
+        setLoading(true);
+        // Get start of today
+        const startDate = new Date();
+        startDate.setHours(0, 0, 0, 0);
         
-        const processedShifts = processShifts(entries);
-        console.log('Processed shifts:', processedShifts);
-        setShifts(processedShifts);
-      }, (error) => {
-        console.error('Error fetching shifts:', error);
-        toast.error('Failed to fetch shifts data');
-      });
+        const q = query(
+          collection(db, 'clock_entries'),
+          where('timestamp', '>=', startDate.toISOString()),
+          orderBy('timestamp', 'desc')
+        );
 
-      return unsubscribe;
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+          console.log('Received shifts snapshot');
+          const entries = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          console.log('Raw entries:', entries);
+          
+          const processedShifts = processShifts(entries);
+          console.log('Processed shifts:', processedShifts);
+          setShifts(processedShifts);
+          setLoading(false);
+        }, (error) => {
+          console.error('Error in shifts snapshot:', error);
+          toast.error('Failed to fetch shifts data');
+          setLoading(false);
+        });
+
+        return unsubscribe;
+      } catch (error) {
+        console.error('Error setting up shifts listener:', error);
+        toast.error('Failed to set up shifts listener');
+        setLoading(false);
+      }
     };
 
     fetchShifts();
@@ -78,37 +79,45 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
 
   const processShifts = (entries) => {
     console.log('Processing shifts from entries:', entries);
+    const userShiftsMap = {};
+
+    // Sort entries by timestamp
     const sortedEntries = [...entries].sort((a, b) => 
       new Date(a.timestamp) - new Date(b.timestamp)
     );
     
-    const userShiftsMap = {};
-
     sortedEntries.forEach(entry => {
-      const userId = entry.user_id;
-      if (!userShiftsMap[userId]) {
-        userShiftsMap[userId] = {
-          userId,
+      if (!entry.user_id) {
+        console.warn('Entry missing user_id:', entry);
+        return;
+      }
+
+      if (!userShiftsMap[entry.user_id]) {
+        userShiftsMap[entry.user_id] = {
+          userId: entry.user_id,
           shifts: [],
           currentClockIn: null
         };
       }
 
       if (entry.action === 'in') {
-        userShiftsMap[userId].currentClockIn = entry;
-      } else if (entry.action === 'out' && userShiftsMap[userId].currentClockIn) {
-        userShiftsMap[userId].shifts.push({
-          clockIn: userShiftsMap[userId].currentClockIn.timestamp,
+        userShiftsMap[entry.user_id].currentClockIn = entry;
+      } else if (entry.action === 'out' && userShiftsMap[entry.user_id].currentClockIn) {
+        userShiftsMap[entry.user_id].shifts.push({
+          clockIn: userShiftsMap[entry.user_id].currentClockIn.timestamp,
           clockOut: entry.timestamp,
-          clockInLocation: userShiftsMap[userId].currentClockIn.location,
+          clockInLocation: userShiftsMap[entry.user_id].currentClockIn.location,
           clockOutLocation: entry.location,
-          latitude: userShiftsMap[userId].currentClockIn.latitude,
-          longitude: userShiftsMap[userId].currentClockIn.longitude,
+          latitude: userShiftsMap[entry.user_id].currentClockIn.latitude,
+          longitude: userShiftsMap[entry.user_id].currentClockIn.longitude,
           clockOutLatitude: entry.latitude,
           clockOutLongitude: entry.longitude,
-          duration: calculateDuration(userShiftsMap[userId].currentClockIn.timestamp, entry.timestamp)
+          duration: calculateDuration(
+            userShiftsMap[entry.user_id].currentClockIn.timestamp, 
+            entry.timestamp
+          )
         });
-        userShiftsMap[userId].currentClockIn = null;
+        userShiftsMap[entry.user_id].currentClockIn = null;
       }
     });
 
@@ -122,11 +131,10 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
           clockOutLocation: null,
           latitude: userData.currentClockIn.latitude,
           longitude: userData.currentClockIn.longitude,
-          clockOutLatitude: null,
-          clockOutLongitude: null,
           duration: calculateDuration(userData.currentClockIn.timestamp, new Date().toISOString())
         });
       }
+      // Sort shifts by clock in time, most recent first
       userData.shifts.sort((a, b) => new Date(b.clockIn) - new Date(a.clockIn));
     });
 
@@ -141,13 +149,6 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
     return durationInHours > 0 ? durationInHours : null;
   };
 
-  const formatDuration = (hours) => {
-    if (hours === null) return '-';
-    const wholeHours = Math.floor(hours);
-    const minutes = Math.round((hours - wholeHours) * 60);
-    return `${wholeHours}h ${minutes}m`;
-  };
-
   const getUserName = (userId) => {
     const user = users[userId] || {};
     if (user.name && user.surname) {
@@ -160,9 +161,7 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
 
   const formatLocation = (fullLocation) => {
     if (!fullLocation) return 'N/A';
-    // Split by comma and get the last part which is usually the city/town
     const parts = fullLocation.split(',');
-    // Get the first part before "Local Municipality" or "Ward"
     const location = parts[0].split('Ward')[0].split('Local Municipality')[0].trim();
     return location;
   };
@@ -183,7 +182,6 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
   };
 
   const getUserStatus = (userData) => {
-    // Check if user has any active shifts
     const hasActiveShift = userData.shifts.some(shift => !shift.clockOut);
     return {
       isOnDuty: hasActiveShift,
@@ -197,7 +195,6 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
       const userA = users[a[0]] || {};
       const userB = users[b[0]] || {};
       
-      // First try to sort by name + surname
       const nameA = `${userA.name || ''} ${userA.surname || ''}`.trim().toLowerCase();
       const nameB = `${userB.name || ''} ${userB.surname || ''}`.trim().toLowerCase();
       
@@ -205,12 +202,19 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
         return nameA.localeCompare(nameB);
       }
       
-      // Fall back to email if name is not available
       const emailA = userA.email || '';
       const emailB = userB.email || '';
       return emailA.localeCompare(emailB);
     });
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
@@ -219,7 +223,7 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
         sortUserEntries={sortUserEntries}
         getUserName={getUserName}
         getUserStatus={getUserStatus}
-        formatDuration={formatDuration}
+        formatDuration={calculateDuration}
         formatLocation={formatLocation}
         handleLocationClick={handleLocationClick}
       />
