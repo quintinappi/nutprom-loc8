@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
-import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, Timestamp, onSnapshot } from 'firebase/firestore';
 import AuthForm from '../components/AuthForm';
 import UserManagement from '../components/UserManagement';
 import TotalHoursPage from '../components/TotalHoursPage';
