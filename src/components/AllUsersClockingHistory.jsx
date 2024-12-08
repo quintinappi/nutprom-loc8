@@ -186,29 +186,23 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
   };
 
   const sortUserEntries = (entries) => {
-    return Object.entries(entries)
-      .filter(([userId, userData]) => {
-        const user = users[userId] || {};
-        // Filter out entries where both name and email are missing or where the user is "Unknown"
-        return (user.name || user.email) && user.name !== 'Unknown User';
-      })
-      .sort((a, b) => {
-        const userA = users[a[0]] || {};
-        const userB = users[b[0]] || {};
-        
-        // First try to sort by name + surname
-        const nameA = `${userA.name || ''} ${userA.surname || ''}`.trim().toLowerCase();
-        const nameB = `${userB.name || ''} ${userB.surname || ''}`.trim().toLowerCase();
-        
-        if (nameA && nameB) {
-          return nameA.localeCompare(nameB);
-        }
-        
-        // Fall back to email if name is not available
-        const emailA = userA.email || '';
-        const emailB = userB.email || '';
-        return emailA.localeCompare(emailB);
-      });
+    return Object.entries(entries).sort((a, b) => {
+      const userA = users[a[0]] || {};
+      const userB = users[b[0]] || {};
+      
+      // First try to sort by name + surname
+      const nameA = `${userA.name || ''} ${userA.surname || ''}`.trim().toLowerCase();
+      const nameB = `${userB.name || ''} ${userB.surname || ''}`.trim().toLowerCase();
+      
+      if (nameA && nameB) {
+        return nameA.localeCompare(nameB);
+      }
+      
+      // Fall back to email if name is not available
+      const emailA = userA.email || '';
+      const emailB = userB.email || '';
+      return emailA.localeCompare(emailB);
+    });
   };
 
   return (

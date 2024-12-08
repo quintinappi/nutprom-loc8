@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useClockEntries } from '../firebase/hooks/useClockEntries';
+import { useClockEntries } from '../integrations/supabase/hooks/useClockEntries';
 import LoadingOverlay from './LoadingOverlay';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';

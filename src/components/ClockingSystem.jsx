@@ -4,6 +4,7 @@ import { db } from '../firebase/config';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from 'sonner';
 import { addOfflineClockEntry, getOfflineClockEntries, removeOfflineClockEntry } from '../utils/offlineSync';
 import ClockingTable from './ClockingTable';
@@ -173,6 +174,14 @@ const ClockingSystem = ({
             <AlertDescription>{locationWarning}</AlertDescription>
           </Alert>
         )}
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="clock-history">
+            <AccordionTrigger className="text-xl font-semibold">My clocking history</AccordionTrigger>
+            <AccordionContent>
+              <ClockingTable entries={clockEntries} />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
     </div>
   );

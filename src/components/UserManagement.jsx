@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from 'sonner';
 import Navbar from './Navbar';
 import { useFirebaseAuth } from '../firebase/auth';
-import UserTableRow from './UserTableRow';
-import PasswordUpdateDialog from './PasswordUpdateDialog';
 
 const UserManagement = ({ onUserDeleted }) => {
   const [users, setUsers] = useState([]);
@@ -15,8 +16,6 @@ const UserManagement = ({ onUserDeleted }) => {
   const [newCode, setNewCode] = useState('');
   const { user, logout } = useFirebaseAuth();
   const [activeTab, setActiveTab] = useState('users');
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, 'users'));
@@ -49,11 +48,13 @@ const UserManagement = ({ onUserDeleted }) => {
 
   const handleCodeSave = async (userId) => {
     try {
+      // Check if code is 4 digits
       if (!/^\d{4}$/.test(newCode)) {
         toast.error('Code must be exactly 4 digits');
         return;
       }
 
+      // Check if code is already in use by another user
       const codeQuery = query(
         collection(db, 'users'), 
         where('code', '==', newCode)
@@ -91,13 +92,8 @@ const UserManagement = ({ onUserDeleted }) => {
     }
   };
 
-  const handleUpdatePassword = (user) => {
-    setSelectedUser(user);
-    setIsPasswordDialogOpen(true);
-  };
-
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
+    <div className="min-h-screen bg-gray-200 flex flex-col">
       <Navbar 
         onLogout={logout}
         activeTab={activeTab}
@@ -105,9 +101,9 @@ const UserManagement = ({ onUserDeleted }) => {
         userRole="admin"
       />
       <div className="container mx-auto p-4 flex-grow">
-        <Card className="mx-auto mt-8 bg-white shadow-sm">
+        <Card className="mx-auto mt-16 mb-8 bg-white">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold">Manage Users</CardTitle>
+            <CardTitle>Manage Users</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
@@ -117,39 +113,76 @@ const UserManagement = ({ onUserDeleted }) => {
                   <TableHead>Current Role</TableHead>
                   <TableHead>Change Role</TableHead>
                   <TableHead>Code</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.map((user) => (
-                  <UserTableRow
-                    key={user.id}
-                    user={user}
-                    editingCode={editingCode}
-                    newCode={newCode}
-                    onRoleChange={handleRoleChange}
-                    onCodeEdit={handleCodeEdit}
-                    onCodeSave={handleCodeSave}
-                    onNewCodeChange={setNewCode}
-                    onUpdatePassword={handleUpdatePassword}
-                    onDelete={handleDelete}
-                  />
+                  <TableRow key={user.id}>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>{user.role}</TableCell>
+                    <TableCell>
+                      <Select
+                        value={user.role}
+                        onValueChange={(value) => handleRoleChange(user.id, value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue>{user.role}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="user">User</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      {editingCode === user.id ? (
+                        <div className="flex gap-2">
+                          <Input
+                            type="text"
+                            value={newCode}
+                            onChange={(e) => setNewCode(e.target.value)}
+                            maxLength={4}
+                            pattern="\d*"
+                            className="w-24"
+                          />
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleCodeSave(user.id)}
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2 items-center">
+                          <span>{user.code}</span>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleCodeEdit(user.id, user.code)}
+                          >
+                            Edit
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDelete(user.id)}
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ))}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
       </div>
-      {selectedUser && (
-        <PasswordUpdateDialog
-          isOpen={isPasswordDialogOpen}
-          onClose={() => {
-            setIsPasswordDialogOpen(false);
-            setSelectedUser(null);
-          }}
-          userEmail={selectedUser.email}
-        />
-      )}
     </div>
   );
 };

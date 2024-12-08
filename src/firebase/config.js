@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { toast } from 'sonner';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDHrxLZEtg2HDDIaGFbji9NWjeIpXNXFXo",
@@ -13,19 +13,9 @@ const firebaseConfig = {
   measurementId: "G-M8L6ECHTV1"
 };
 
-let app;
-let auth;
-let db;
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const storage = getStorage(app);
 
-try {
-  console.log('Initializing Firebase...');
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-  console.log('Firebase initialized successfully');
-} catch (error) {
-  console.error('Error initializing Firebase:', error);
-  toast.error('Error initializing application. Please refresh the page.');
-}
-
-export { db, auth };
+export { db, auth, storage };
