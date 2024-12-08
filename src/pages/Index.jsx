@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useFirebaseAuth } from '../firebase/auth';
 import { db } from '../firebase/config';
-import { doc, getDoc, collection, setDoc, query, where, onSnapshot, getDocs, writeBatch, Timestamp, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, collection, setDoc, query, where, onSnapshot, getDocs, writeBatch, Timestamp, updateDoc, arrayUnion, orderBy } from 'firebase/firestore';
 import AuthForm from '../components/AuthForm';
 import Navbar from '../components/Navbar';
 import LoadingOverlay from '../components/LoadingOverlay';
@@ -304,6 +304,8 @@ const Index = () => {
     const setupReadNotificationsListener = async () => {
       if (!user || userRole !== 'admin') return;
 
+      console.log('Setting up read notifications listener for user:', user.uid);
+
       const q = query(
         collection(db, 'notifications'),
         where('userId', '==', user.uid),
@@ -312,10 +314,12 @@ const Index = () => {
       );
 
       unsubscribe = onSnapshot(q, (querySnapshot) => {
+        console.log('Received read notifications update');
         const notificationsList = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
+        console.log('Processed notifications:', notificationsList);
         setReadNotifications(notificationsList);
       });
     };
