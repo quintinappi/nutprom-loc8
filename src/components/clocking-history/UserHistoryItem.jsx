@@ -15,7 +15,7 @@ const UserHistoryItem = ({
   const userName = getUserName(userId);
   
   // Skip rendering if user is unknown
-  if (userName.includes('Unknown User')) {
+  if (userName === 'Unknown User') {
     return null;
   }
 
