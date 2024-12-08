@@ -11,6 +11,7 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
   useEffect(() => {
     // Fetch users data
     const fetchUsers = async () => {
+      console.log('Fetching users...');
       const q = query(collection(db, 'users'));
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const usersData = {};
@@ -21,6 +22,7 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
             email: doc.data().email || ''
           };
         });
+        console.log('Users fetched:', usersData);
         setUsers(usersData);
       });
       return unsubscribe;
@@ -31,8 +33,10 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
 
   useEffect(() => {
     const fetchShifts = async () => {
+      console.log('Fetching shifts...');
       let startDate = new Date();
       startDate.setHours(0, 0, 0, 0);
+      console.log('Start date:', startDate.toISOString());
 
       const q = query(
         collection(db, 'clock_entries'),
@@ -41,13 +45,19 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
       );
 
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        console.log('Shifts snapshot received');
         const entries = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
+        console.log('Raw entries:', entries);
         
         const processedShifts = processShifts(entries);
+        console.log('Processed shifts:', processedShifts);
         setShifts(processedShifts);
+      }, (error) => {
+        console.error('Error fetching shifts:', error);
+        toast.error('Failed to fetch shifts data');
       });
 
       return unsubscribe;
@@ -57,6 +67,7 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
   }, []);
 
   const processShifts = (entries) => {
+    console.log('Processing shifts from entries:', entries);
     const sortedEntries = [...entries].sort((a, b) => 
       new Date(a.timestamp) - new Date(b.timestamp)
     );
@@ -109,6 +120,7 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
       userData.shifts.sort((a, b) => new Date(b.clockIn) - new Date(a.clockIn));
     });
 
+    console.log('Final processed shifts:', userShiftsMap);
     return userShiftsMap;
   };
 
