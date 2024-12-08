@@ -1,28 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
-import AuthForm from '../components/AuthForm';
-import ClockingSystem from '../components/ClockingSystem';
-import UserShifts from '../components/UserShifts';
-import Navbar from '../components/Navbar';
-import Settings from '../components/Settings';
-import LoadingOverlay from '../components/LoadingOverlay';
-import InstallPrompt from '../components/InstallPrompt';
-import UserManagement from '../components/UserManagement';
-import AllUsersClockingHistory from '../components/AllUsersClockingHistory';
-import MapPopup from '../components/MapPopup';
-import NotificationCenter from '../components/NotificationCenter';
-import TotalHoursPage from '../components/TotalHoursPage';
-import Footer from '../components/Footer';
-import Logo from '../components/Logo';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import { useFirebaseAuth } from '../firebase/auth';
 import { db } from '../firebase/config';
-import { doc, getDoc, collection, setDoc, query, where, onSnapshot, getDocs, writeBatch, Timestamp, updateDoc, arrayUnion, orderBy } from 'firebase/firestore';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { doc, getDoc, collection, setDoc, query, where, onSnapshot, getDocs, writeBatch, Timestamp, updateDoc, arrayUnion } from 'firebase/firestore';
+import AuthForm from '../components/AuthForm';
+import Navbar from '../components/Navbar';
+import LoadingOverlay from '../components/LoadingOverlay';
+import InstallPrompt from '../components/InstallPrompt';
+import MapPopup from '../components/MapPopup';
+import Footer from '../components/Footer';
 import { syncClockEntries } from '../utils/offlineSync';
-import { toast } from 'sonner';
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import OverviewTab from '../components/dashboard/OverviewTab';
+import ShiftsTab from '../components/dashboard/ShiftsTab';
+import AllUsersTab from '../components/dashboard/AllUsersTab';
 
 const ClockingAnimation = ({ isVisible, action }) => (
   <AnimatePresence>
@@ -302,7 +295,6 @@ const Index = () => {
   };
 
   const handleUserDeleted = useCallback(() => {
-    // Implement user deletion logic here
     console.log('User deleted');
   }, []);
 
@@ -353,92 +345,40 @@ const Index = () => {
           )}
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Profile Card */}
-            <Card className="col-span-1 md:col-span-2">
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center mb-6">
-                  <Logo size="large" />
-                  <div className={`mt-4 flex flex-col items-center ${isLongShift ? 'bg-red-100 p-4 rounded' : ''}`}>
-                    <Avatar className="w-24 h-24 mb-2">
-                      <AvatarImage src={profilePic} alt={`${name} ${surname}`} className="object-cover" />
-                      <AvatarFallback>{name.charAt(0)}{surname.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <h2 className="text-xl font-semibold">{name} {surname}</h2>
-                    <p className="text-sm text-gray-600 mt-1">Status: {clockStatus}</p>
-                    {isLongShift && (
-                      <Alert variant="destructive" className="mt-2">
-                        <AlertDescription>
-                          Warning: Current shift exceeds 12 hours!
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Clocking Card */}
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="text-lg font-semibold mb-4">Clock In/Out</h3>
-                <ClockingSystem 
-                  userId={user.uid} 
-                  userRole={userRole} 
-                  onClockAction={handleClockAction} 
-                  setIsLoading={setIsLoading}
-                  isOnline={isOnline}
-                  onStatusUpdate={handleClockStatusUpdate}
-                  hideHeader={true}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Notifications Card (Admin Only) */}
-            {userRole === 'admin' && (
-              <Card>
-                <CardContent className="pt-6">
-                  <h3 className="text-lg font-semibold mb-4">Notifications</h3>
-                  <NotificationCenter 
-                    notifications={notifications}
-                    readNotifications={readNotifications}
-                    onDeleteNotification={handleDeleteNotification}
-                    onMarkAllAsRead={handleMarkAllNotificationsAsRead}
-                    users={users}
-                    onCollapseMenu={() => setActiveTab('clock')}
-                  />
-                </CardContent>
-              </Card>
-            )}
-          </div>
+        <TabsContent value="overview">
+          <OverviewTab 
+            user={user}
+            name={name}
+            surname={surname}
+            profilePic={profilePic}
+            clockStatus={clockStatus}
+            isLongShift={isLongShift}
+            userRole={userRole}
+            handleClockAction={handleClockAction}
+            setIsLoading={setIsLoading}
+            isOnline={isOnline}
+            handleClockStatusUpdate={handleClockStatusUpdate}
+            notifications={notifications}
+            readNotifications={readNotifications}
+            handleDeleteNotification={handleDeleteNotification}
+            handleMarkAllAsRead={handleMarkAllNotificationsAsRead}
+            users={users}
+          />
         </TabsContent>
 
         <TabsContent value="shifts">
-          <Card>
-            <CardContent className="pt-6">
-              <h3 className="text-lg font-semibold mb-4">Shifts & History</h3>
-              <UserShifts 
-                userId={user.uid} 
-                userRole={userRole} 
-                onUnclockedUsers={handleUnclockedUsers}
-                onLongShifts={handleLongShifts}
-                showHistory={true}
-                showLocation={true}
-                onLocationClick={handleLocationClick}
-              />
-            </CardContent>
-          </Card>
+          <ShiftsTab 
+            userId={user.uid}
+            userRole={userRole}
+            handleUnclockedUsers={handleUnclockedUsers}
+            handleLongShifts={handleLongShifts}
+            handleLocationClick={handleLocationClick}
+          />
         </TabsContent>
 
         {userRole === 'admin' && (
           <TabsContent value="all-users">
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="text-lg font-semibold mb-4">All Users Activity</h3>
-                <AllUsersClockingHistory onLocationClick={handleLocationClick} />
-              </CardContent>
-            </Card>
+            <AllUsersTab handleLocationClick={handleLocationClick} />
           </TabsContent>
         )}
       </Tabs>
