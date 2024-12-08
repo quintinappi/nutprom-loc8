@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import { toast } from 'sonner';
+import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDHrxLZEtg2HDDIaGFbji9NWjeIpXNXFXo",
@@ -13,19 +13,34 @@ const firebaseConfig = {
   measurementId: "G-M8L6ECHTV1"
 };
 
-let app;
-let auth;
-let db;
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const storage = getStorage(app);
 
-try {
-  console.log('Initializing Firebase...');
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-  console.log('Firebase initialized successfully');
-} catch (error) {
-  console.error('Error initializing Firebase:', error);
-  toast.error('Error initializing application. Please refresh the page.');
-}
+// Enable offline persistence
+enableIndexedDbPersistence(db).catch((err) => {
+  console.error('Firebase persistence error:', err);
+  if (err.code === 'failed-precondition') {
+    console.log('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+  } else if (err.code === 'unimplemented') {
+    console.log('The current browser doesn\'t support persistence.');
+  }
+});
 
-export { db, auth };
+// Set up auth state listener
+onAuthStateChanged(auth, (user) => {
+  console.log('Auth state changed:', user ? 'User logged in' : 'User logged out');
+  if (user) {
+    // Get new token if current one is about to expire
+    user.getIdToken(true).then((token) => {
+      console.log('Token refreshed successfully');
+    }).catch((error) => {
+      console.error('Error refreshing token:', error);
+      // If token refresh fails, force re-login
+      auth.signOut();
+    });
+  }
+});
+
+export { db, auth, storage };
