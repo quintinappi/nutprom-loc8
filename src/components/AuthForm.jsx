@@ -20,6 +20,7 @@ const AuthForm = () => {
     console.log('Firebase error code:', errorCode);
     switch (errorCode) {
       case 'INVALID_LOGIN_CREDENTIALS':
+      case 'auth/invalid-credential':
         return 'Invalid email or password. Please check your credentials and try again.';
       case 'auth/email-already-in-use':
         return 'An account with this email already exists.';
@@ -27,6 +28,8 @@ const AuthForm = () => {
         return 'Password should be at least 6 characters long.';
       case 'auth/invalid-email':
         return 'Please enter a valid email address.';
+      case 'auth/network-request-failed':
+        return 'Network error. Please check your internet connection and try again.';
       default:
         return 'An error occurred. Please try again.';
     }
@@ -51,13 +54,13 @@ const AuthForm = () => {
         
         toast.success('Account created successfully!');
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
-        console.log('User signed in successfully');
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        console.log('User signed in successfully:', userCredential.user.uid);
         toast.success('Signed in successfully!');
       }
     } catch (error) {
       console.error('Authentication error:', error);
-      const errorMessage = getReadableErrorMessage(error.code || error.message);
+      const errorMessage = getReadableErrorMessage(error.code);
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {

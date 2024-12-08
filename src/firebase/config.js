@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getMessaging, getToken } from 'firebase/messaging';
 import { toast } from 'sonner';
 
@@ -14,8 +14,17 @@ const firebaseConfig = {
   measurementId: "G-M8L6ECHTV1"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase with error handling
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+  console.log('Firebase initialized successfully');
+} catch (error) {
+  console.error('Error initializing Firebase:', error);
+  toast.error('Error initializing application. Please refresh the page.');
+}
+
+// Initialize Firestore with error handling
 const db = getFirestore(app);
 const auth = getAuth(app);
 
@@ -36,10 +45,11 @@ try {
   console.error('Error enabling persistence:', err);
 }
 
-// Initialize Firebase Cloud Messaging
+// Initialize Firebase Cloud Messaging with error handling
 let messaging = null;
 try {
   messaging = getMessaging(app);
+  console.log('Firebase Cloud Messaging initialized');
 } catch (err) {
   console.warn('Firebase messaging not supported:', err);
 }
@@ -52,12 +62,22 @@ export const getFCMToken = async () => {
     const currentToken = await getToken(messaging, {
       vapidKey: 'YOUR_VAPID_KEY'
     });
+    console.log('FCM token obtained successfully');
     return currentToken;
   } catch (err) {
     console.error('Error getting FCM token:', err);
     return null;
   }
 };
+
+// Add network state monitoring
+auth.onAuthStateChanged((user) => {
+  if (user) {
+    console.log('Auth state changed: User is signed in');
+  } else {
+    console.log('Auth state changed: User is signed out');
+  }
+});
 
 // Export initialized services
 export { db, auth, messaging };
