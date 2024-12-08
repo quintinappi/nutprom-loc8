@@ -1,25 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import AuthForm from '../components/AuthForm';
-import ClockingSystem from '../components/ClockingSystem';
-import UserShifts from '../components/UserShifts';
-import Navbar from '../components/Navbar';
+import UserManagement from '../components/UserManagement';
+import TotalHoursPage from '../components/TotalHoursPage';
 import Settings from '../components/Settings';
 import LoadingOverlay from '../components/LoadingOverlay';
 import InstallPrompt from '../components/InstallPrompt';
-import UserManagement from '../components/UserManagement';
-import AllUsersClockingHistory from '../components/AllUsersClockingHistory';
 import MapPopup from '../components/MapPopup';
-import TotalHoursPage from '../components/TotalHoursPage';
 import Footer from '../components/Footer';
-import ProfileSection from '../components/dashboard/ProfileSection';
-import NotificationsSection from '../components/dashboard/NotificationsSection';
+import Navbar from '../components/Navbar';
+import DashboardContent from '../components/dashboard/DashboardContent';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFirebaseAuth } from '../firebase/auth';
 import { db } from '../firebase/config';
-import { doc, getDoc, collection, setDoc, query, where, onSnapshot, getDocs, writeBatch, Timestamp, updateDoc, arrayUnion, orderBy } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ClockingAnimation = ({ isVisible, action }) => (
   <AnimatePresence>
@@ -144,100 +139,52 @@ const Index = () => {
     }
   };
 
-  const isLongShift = currentShiftDuration >= 12;
-
-  const renderDashboardContent = () => {
-    return (
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-8">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="shifts">Shifts & History</TabsTrigger>
-          {userRole === 'admin' && (
-            <TabsTrigger value="all-users">All Users</TabsTrigger>
-          )}
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <ProfileSection 
-              name={name}
-              surname={surname}
-              profilePic={profilePic}
-              clockStatus={clockStatus}
-              isLongShift={isLongShift}
-            />
-
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="text-lg font-semibold mb-4">Clock In/Out</h3>
-                <ClockingSystem 
-                  userId={user.uid} 
-                  userRole={userRole} 
-                  onClockAction={setClockingAction} 
-                  setIsLoading={setIsLoading}
-                  isOnline={isOnline}
-                  onStatusUpdate={setClockStatus}
-                  hideHeader={true}
-                />
-              </CardContent>
-            </Card>
-
-            {userRole === 'admin' && (
-              <NotificationsSection 
-                notifications={notifications}
-                readNotifications={readNotifications}
-                onDeleteNotification={handleDeleteNotification}
-                onMarkAllAsRead={handleMarkAllNotificationsAsRead}
-                users={users}
-                onCollapseMenu={() => setActiveTab('clock')}
-              />
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="shifts">
-          <Card>
-            <CardContent className="pt-6">
-              <h3 className="text-lg font-semibold mb-4">Shifts & History</h3>
-              <UserShifts 
-                userId={user.uid} 
-                userRole={userRole} 
-                onUnclockedUsers={handleUnclockedUsers}
-                onLongShifts={handleLongShifts}
-                showHistory={true}
-                showLocation={true}
-                onLocationClick={handleLocationClick}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {userRole === 'admin' && (
-          <TabsContent value="all-users">
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="text-lg font-semibold mb-4">All Users Activity</h3>
-                <AllUsersClockingHistory onLocationClick={handleLocationClick} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-      </Tabs>
-    );
-  };
-
   const renderContent = () => {
+    if (loading) {
+      return <LoadingOverlay isLoading={true} />;
+    }
+
+    if (!user) {
+      return <AuthForm />;
+    }
+
     switch (activeTab) {
       case 'clock':
-        return renderDashboardContent();
+        return (
+          <DashboardContent
+            user={user}
+            userRole={userRole}
+            name={name}
+            surname={surname}
+            profilePic={profilePic}
+            clockStatus={clockStatus}
+            isLongShift={currentShiftDuration >= 12}
+            notifications={notifications}
+            readNotifications={readNotifications}
+            handleDeleteNotification={() => {}}
+            handleMarkAllNotificationsAsRead={() => {}}
+            users={users}
+            onCollapseMenu={() => setActiveTab('clock')}
+            handleUnclockedUsers={() => {}}
+            handleLongShifts={() => {}}
+            handleLocationClick={(location) => {
+              setSelectedLocation(location);
+              setIsMapOpen(true);
+            }}
+            setClockingAction={setClockingAction}
+            setIsLoading={setIsLoading}
+            isOnline={isOnline}
+            setClockStatus={setClockStatus}
+          />
+        );
       case 'total-hours':
         return <TotalHoursPage />;
       case 'users':
-        return userRole === 'admin' ? <UserManagement onUserDeleted={handleUserDeleted} /> : null;
+        return userRole === 'admin' ? <UserManagement onUserDeleted={() => {}} /> : null;
       case 'settings':
         return (
           <Settings 
-            onProfileUpdate={handleProfileUpdate} 
+            onProfileUpdate={() => {}} 
             setIsLoading={setIsLoading}
           />
         );
@@ -250,7 +197,7 @@ const Index = () => {
     <div className="min-h-screen bg-gray-200 flex flex-col">
       <LoadingOverlay isLoading={isLoading} />
       <Navbar 
-        onLogout={handleLogout} 
+        onLogout={logout} 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         userRole={userRole}
