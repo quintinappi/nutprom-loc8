@@ -7,28 +7,61 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { toast } from 'sonner';
 
 const AuthForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const getReadableErrorMessage = (errorCode) => {
+    console.log('Firebase error code:', errorCode);
+    switch (errorCode) {
+      case 'INVALID_LOGIN_CREDENTIALS':
+        return 'Invalid email or password. Please check your credentials and try again.';
+      case 'auth/email-already-in-use':
+        return 'An account with this email already exists.';
+      case 'auth/weak-password':
+        return 'Password should be at least 6 characters long.';
+      case 'auth/invalid-email':
+        return 'Please enter a valid email address.';
+      default:
+        return 'An error occurred. Please try again.';
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setIsLoading(true);
+
     try {
+      console.log('Attempting authentication...', { isSignUp, email });
+      
       if (isSignUp) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        console.log('User created successfully:', userCredential.user.uid);
+        
         await setDoc(doc(db, 'users', userCredential.user.uid), {
           email: email,
           role: 'user' // Default role for new users
         });
+        
+        toast.success('Account created successfully!');
       } else {
         await signInWithEmailAndPassword(auth, email, password);
+        console.log('User signed in successfully');
+        toast.success('Signed in successfully!');
       }
     } catch (error) {
-      setError(error.message);
+      console.error('Authentication error:', error);
+      const errorMessage = getReadableErrorMessage(error.code || error.message);
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -48,6 +81,8 @@ const AuthForm = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={isLoading}
+                placeholder="Enter your email"
               />
             </div>
             <div className="space-y-2">
@@ -58,6 +93,9 @@ const AuthForm = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={isLoading}
+                placeholder="Enter your password"
+                minLength={6}
               />
             </div>
             {error && (
@@ -65,16 +103,24 @@ const AuthForm = () => {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            <Button type="submit" className="w-full">
-              {isSignUp ? 'Sign Up' : 'Log In'}
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isLoading}
+            >
+              {isLoading ? 'Please wait...' : (isSignUp ? 'Sign Up' : 'Log In')}
             </Button>
           </form>
           <p className="text-center mt-4">
             {isSignUp ? 'Already have an account?' : "Don't have an account?"}
             <Button
               variant="link"
-              onClick={() => setIsSignUp(!isSignUp)}
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setError(null);
+              }}
               className="ml-2"
+              disabled={isLoading}
             >
               {isSignUp ? 'Log In' : 'Sign Up'}
             </Button>
