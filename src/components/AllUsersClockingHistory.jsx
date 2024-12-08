@@ -38,9 +38,11 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
       console.log('Fetching shifts...');
       try {
         setLoading(true);
-        // Get start of today using Firestore Timestamp
+        // Get start of today
         const startDate = new Date();
         startDate.setHours(0, 0, 0, 0);
+        
+        console.log('Creating query with startDate:', startDate, 'Timestamp:', Timestamp.fromDate(startDate));
         
         const q = query(
           collection(db, 'clock_entries'),
@@ -48,18 +50,23 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
           orderBy('timestamp', 'desc')
         );
 
-        console.log('Query created with startDate:', startDate);
-
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
-          console.log('Received shifts snapshot');
-          const entries = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          console.log('Raw entries:', entries);
+          console.log('Received shifts snapshot with', querySnapshot.size, 'documents');
+          const entries = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            console.log('Processing document:', doc.id, 'Data:', data);
+            return {
+              id: doc.id,
+              ...data,
+              // Ensure timestamp is properly handled
+              timestamp: data.timestamp?.toDate?.() || new Date(data.timestamp)
+            };
+          });
+          
+          console.log('Processed entries:', entries);
           
           const processedShifts = processShifts(entries);
-          console.log('Processed shifts:', processedShifts);
+          console.log('Final processed shifts:', processedShifts);
           setShifts(processedShifts);
           setLoading(false);
         }, (error) => {
@@ -84,9 +91,11 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
     const userShiftsMap = {};
 
     // Sort entries by timestamp
-    const sortedEntries = [...entries].sort((a, b) => 
-      new Date(a.timestamp) - new Date(b.timestamp)
-    );
+    const sortedEntries = [...entries].sort((a, b) => {
+      const dateA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+      const dateB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
+      return dateA - dateB;
+    });
     
     sortedEntries.forEach(entry => {
       if (!entry.user_id) {
@@ -102,24 +111,26 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
         };
       }
 
+      const currentUser = userShiftsMap[entry.user_id];
+
       if (entry.action === 'in') {
-        userShiftsMap[entry.user_id].currentClockIn = entry;
-      } else if (entry.action === 'out' && userShiftsMap[entry.user_id].currentClockIn) {
-        userShiftsMap[entry.user_id].shifts.push({
-          clockIn: userShiftsMap[entry.user_id].currentClockIn.timestamp,
+        currentUser.currentClockIn = entry;
+      } else if (entry.action === 'out' && currentUser.currentClockIn) {
+        currentUser.shifts.push({
+          clockIn: currentUser.currentClockIn.timestamp,
           clockOut: entry.timestamp,
-          clockInLocation: userShiftsMap[entry.user_id].currentClockIn.location,
+          clockInLocation: currentUser.currentClockIn.location,
           clockOutLocation: entry.location,
-          latitude: userShiftsMap[entry.user_id].currentClockIn.latitude,
-          longitude: userShiftsMap[entry.user_id].currentClockIn.longitude,
+          latitude: currentUser.currentClockIn.latitude,
+          longitude: currentUser.currentClockIn.longitude,
           clockOutLatitude: entry.latitude,
           clockOutLongitude: entry.longitude,
           duration: calculateDuration(
-            userShiftsMap[entry.user_id].currentClockIn.timestamp, 
+            currentUser.currentClockIn.timestamp, 
             entry.timestamp
           )
         });
-        userShiftsMap[entry.user_id].currentClockIn = null;
+        currentUser.currentClockIn = null;
       }
     });
 
@@ -133,7 +144,7 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
           clockOutLocation: null,
           latitude: userData.currentClockIn.latitude,
           longitude: userData.currentClockIn.longitude,
-          duration: calculateDuration(userData.currentClockIn.timestamp, new Date().toISOString())
+          duration: calculateDuration(userData.currentClockIn.timestamp, new Date())
         });
       }
       // Sort shifts by clock in time, most recent first
