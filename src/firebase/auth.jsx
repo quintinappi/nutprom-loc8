@@ -2,6 +2,7 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 import { auth, db } from './config';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 const FirebaseAuthContext = createContext();
 
@@ -9,16 +10,31 @@ export const FirebaseAuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log('Auth state changed in provider:', user ? 'User present' : 'No user');
       setUser(user);
       if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          setUserRole(userDoc.data().role);
-        } else {
-          setUserRole('user'); // Default role
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            setUserRole(userDoc.data().role);
+          } else {
+            setUserRole('user'); // Default role
+          }
+        } catch (error) {
+          console.error('Error fetching user role:', error);
+          if (!isOnline) {
+            toast.error('You are currently offline. Some features may be limited.');
+          }
         }
       } else {
         setUserRole(null);
@@ -26,24 +42,47 @@ export const FirebaseAuthProvider = ({ children }) => {
       setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   const login = async (email, password) => {
-    return signInWithEmailAndPassword(auth, email, password);
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      console.log('Login successful');
+      return result;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
   };
 
   const signup = async (email, password) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await setDoc(doc(db, 'users', userCredential.user.uid), {
-      email: email,
-      role: 'user' // Default role for new users
-    });
-    return userCredential;
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        email: email,
+        role: 'user'
+      });
+      console.log('Signup successful');
+      return userCredential;
+    } catch (error) {
+      console.error('Signup error:', error);
+      throw error;
+    }
   };
 
-  const logout = () => {
-    return signOut(auth);
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      console.log('Logout successful');
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
+    }
   };
 
   const value = {
@@ -52,7 +91,8 @@ export const FirebaseAuthProvider = ({ children }) => {
     loading,
     login,
     signup,
-    logout
+    logout,
+    isOnline
   };
 
   return (
@@ -64,58 +104,4 @@ export const FirebaseAuthProvider = ({ children }) => {
 
 export const useFirebaseAuth = () => {
   return useContext(FirebaseAuthContext);
-};
-
-export const FirebaseAuthUI = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
-  const { login, signup } = useFirebaseAuth();
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (isSignUp) {
-        await signup(email, password);
-      } else {
-        await login(email, password);
-      }
-    } catch (error) {
-      console.error('Authentication error:', error);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="Email"
-        className="w-full p-2 border rounded"
-        required
-      />
-      <input
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="Password"
-        className="w-full p-2 border rounded"
-        required
-      />
-      <button type="submit" className="w-full p-2 bg-blue-500 text-white rounded">
-        {isSignUp ? 'Sign Up' : 'Log In'}
-      </button>
-      <p className="text-center">
-        {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-        <button
-          type="button"
-          onClick={() => setIsSignUp(!isSignUp)}
-          className="ml-2 text-blue-500"
-        >
-          {isSignUp ? 'Log In' : 'Sign Up'}
-        </button>
-      </p>
-    </form>
-  );
 };
