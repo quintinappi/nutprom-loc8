@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { toast } from 'sonner';
 import TimePeriodTabs from './clocking-history/TimePeriodTabs';
@@ -42,13 +42,17 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
       startDate.setHours(0, 0, 0, 0);
       console.log('Start date:', startDate);
 
+      // Convert to Firestore Timestamp
+      const firestoreTimestamp = Timestamp.fromDate(startDate);
+      console.log('Firestore timestamp:', firestoreTimestamp);
+
       const q = query(
         collection(db, 'clock_entries'),
-        where('timestamp', '>=', startDate.toISOString()),
+        where('timestamp', '>=', firestoreTimestamp),
         orderBy('timestamp', 'desc')
       );
 
-      console.log('Querying with start date:', startDate.toISOString());
+      console.log('Querying with Firestore timestamp:', firestoreTimestamp);
 
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
         console.log('Shifts snapshot received');
