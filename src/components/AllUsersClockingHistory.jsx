@@ -186,10 +186,14 @@ const AllUsersClockingHistory = ({ onLocationClick, period = 'today' }) => {
   };
 
   const formatLocation = (fullLocation) => {
-    if (!fullLocation) return 'N/A';
+    console.log('Formatting location:', fullLocation); // Debug log
+    if (!fullLocation || typeof fullLocation !== 'string') {
+      console.log('Invalid location data:', fullLocation); // Debug log
+      return 'N/A';
+    }
     const parts = fullLocation.split(',');
     const location = parts[0].split('Ward')[0].split('Local Municipality')[0].trim();
-    return location;
+    return location || 'N/A';
   };
 
   const handleLocationClick = (shift) => {
