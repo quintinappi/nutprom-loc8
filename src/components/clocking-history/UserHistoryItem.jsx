@@ -14,8 +14,8 @@ const UserHistoryItem = ({
   const status = getUserStatus(userData);
   const userName = getUserName(userId);
   
-  // Skip rendering if user is unknown
-  if (userName === 'Unknown User') {
+  // Show all users, including those with no name/surname but valid email
+  if (!userName || userName === '') {
     return null;
   }
 
