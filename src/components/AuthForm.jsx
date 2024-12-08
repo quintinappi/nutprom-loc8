@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { auth, db } from '../firebase/config';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,26 @@ const AuthForm = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        console.log('Auth state changed - User logged in:', user.uid);
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            console.log('User data retrieved:', userDoc.data());
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+      } else {
+        console.log('Auth state changed - No user');
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const getReadableErrorMessage = (errorCode) => {
     console.log('Firebase error code:', errorCode);
@@ -51,7 +71,8 @@ const AuthForm = () => {
         
         await setDoc(doc(db, 'users', userCredential.user.uid), {
           email: email,
-          role: 'user'
+          role: 'user',
+          createdAt: new Date().toISOString()
         });
         
         toast.success('Account created successfully!');
@@ -59,6 +80,17 @@ const AuthForm = () => {
         console.log('Attempting to sign in...');
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         console.log('User signed in successfully:', userCredential.user.uid);
+        
+        // Verify user data exists
+        const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+        if (!userDoc.exists()) {
+          await setDoc(doc(db, 'users', userCredential.user.uid), {
+            email: email,
+            role: 'user',
+            createdAt: new Date().toISOString()
+          });
+        }
+        
         toast.success('Signed in successfully!');
       }
     } catch (error) {
