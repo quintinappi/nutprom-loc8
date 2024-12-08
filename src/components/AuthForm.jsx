@@ -1,13 +1,11 @@
 import { useState } from 'react';
-import { auth, db } from '../firebase/config';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
+import { authService } from '../services/authService';
 
 const AuthForm = () => {
   const [email, setEmail] = useState('');
@@ -16,20 +14,24 @@ const AuthForm = () => {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const getReadableErrorMessage = (errorCode) => {
-    console.log('Firebase error code:', errorCode);
-    switch (errorCode) {
-      case 'INVALID_LOGIN_CREDENTIALS':
-        return 'Invalid email or password. Please check your credentials and try again.';
-      case 'auth/email-already-in-use':
-        return 'An account with this email already exists.';
-      case 'auth/weak-password':
-        return 'Password should be at least 6 characters long.';
-      case 'auth/invalid-email':
-        return 'Please enter a valid email address.';
-      default:
-        return 'An error occurred. Please try again.';
+  const getReadableErrorMessage = (error) => {
+    console.log('Error details:', error);
+    
+    if (error.code === 'auth/network-request-failed') {
+      return 'Network error. Please check your internet connection and try again.';
     }
+    
+    if (error.code === 'auth/invalid-login-credentials' || 
+        error.code === 'auth/invalid-credential' || 
+        error.code === 'INVALID_LOGIN_CREDENTIALS') {
+      return 'Invalid email or password. Please check your credentials and try again.';
+    }
+    
+    if (error.code === 'auth/email-already-in-use') {
+      return 'An account with this email already exists.';
+    }
+    
+    return error.message || 'An unexpected error occurred. Please try again.';
   };
 
   const handleSubmit = async (e) => {
@@ -38,26 +40,21 @@ const AuthForm = () => {
     setIsLoading(true);
 
     try {
-      console.log('Attempting authentication...', { isSignUp, email });
+      console.log(`Starting ${isSignUp ? 'sign up' : 'sign in'} process for email:`, email);
       
       if (isSignUp) {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        console.log('User created successfully:', userCredential.user.uid);
-        
-        await setDoc(doc(db, 'users', userCredential.user.uid), {
-          email: email,
-          role: 'user' // Default role for new users
-        });
-        
+        await authService.signUp(email, password);
         toast.success('Account created successfully!');
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
-        console.log('User signed in successfully');
+        await authService.signIn(email, password);
         toast.success('Signed in successfully!');
       }
+      
+      setEmail('');
+      setPassword('');
     } catch (error) {
       console.error('Authentication error:', error);
-      const errorMessage = getReadableErrorMessage(error.code || error.message);
+      const errorMessage = getReadableErrorMessage(error);
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
