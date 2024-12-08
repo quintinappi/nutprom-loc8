@@ -4,7 +4,7 @@ import { db } from '../firebase/config';
 import { toast } from 'sonner';
 import TimePeriodTabs from './clocking-history/TimePeriodTabs';
 
-const AllUsersClockingHistory = ({ onLocationClick }) => {
+const AllUsersClockingHistory = ({ onLocationClick, period = 'today' }) => {
   const [shifts, setShifts] = useState({});
   const [users, setUsers] = useState({});
   const [loading, setLoading] = useState(true);
@@ -35,16 +35,30 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
 
   useEffect(() => {
     const fetchShifts = async () => {
-      console.log('Fetching shifts...');
+      console.log('Fetching shifts for period:', period);
       try {
         setLoading(true);
-        // Get start of today
+        
+        // Calculate start date based on period
         const startDate = new Date();
         startDate.setHours(0, 0, 0, 0);
         
+        switch(period) {
+          case 'week':
+            startDate.setDate(startDate.getDate() - 7);
+            break;
+          case 'month':
+            startDate.setMonth(startDate.getMonth() - 1);
+            break;
+          case 'all':
+            // Set to a past date to get all entries
+            startDate.setFullYear(2000);
+            break;
+          // 'today' is default, already set
+        }
+        
         console.log('Creating query with startDate:', startDate, 'Timestamp:', Timestamp.fromDate(startDate));
         
-        // Remove the where clause that was filtering by user_id
         const q = query(
           collection(db, 'clock_entries'),
           where('timestamp', '>=', Timestamp.fromDate(startDate)),
@@ -55,7 +69,6 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
           console.log('Received shifts snapshot with', querySnapshot.size, 'documents');
           const entries = querySnapshot.docs.map(doc => {
             const data = doc.data();
-            console.log('Processing document:', doc.id, 'Data:', data);
             return {
               id: doc.id,
               ...data,
@@ -84,7 +97,7 @@ const AllUsersClockingHistory = ({ onLocationClick }) => {
     };
 
     fetchShifts();
-  }, []);
+  }, [period]);
 
   const processShifts = (entries) => {
     console.log('Processing shifts from entries:', entries);

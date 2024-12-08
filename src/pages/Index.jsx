@@ -15,6 +15,7 @@ import Footer from '../components/Footer';
 import { syncClockEntries } from '../utils/offlineSync';
 import OverviewTab from '../components/dashboard/OverviewTab';
 import ShiftsTab from '../components/dashboard/ShiftsTab';
+import AllUsersTab from '../components/dashboard/AllUsersTab';
 
 const ClockingAnimation = ({ isVisible, action }) => (
   <AnimatePresence>
@@ -340,9 +341,12 @@ const Index = () => {
   const renderDashboardContent = () => {
     return (
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-8">
+        <TabsList className="grid w-full grid-cols-3 mb-8">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="shifts">Shifts & History</TabsTrigger>
+          {userRole === 'admin' && (
+            <TabsTrigger value="all-users">All Users</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="overview">
@@ -375,28 +379,14 @@ const Index = () => {
             handleLocationClick={handleLocationClick}
           />
         </TabsContent>
+
+        {userRole === 'admin' && (
+          <TabsContent value="all-users">
+            <AllUsersTab handleLocationClick={handleLocationClick} />
+          </TabsContent>
+        )}
       </Tabs>
     );
-  };
-
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'clock':
-        return renderDashboardContent();
-      case 'total-hours':
-        return <TotalHoursPage />;
-      case 'users':
-        return userRole === 'admin' ? <UserManagement onUserDeleted={handleUserDeleted} /> : null;
-      case 'settings':
-        return (
-          <Settings 
-            onProfileUpdate={handleProfileUpdate} 
-            setIsLoading={setIsLoading}
-          />
-        );
-      default:
-        return null;
-    }
   };
 
   return (
@@ -411,7 +401,7 @@ const Index = () => {
       <div className="container mx-auto p-4 flex-grow">
         <Card className="mx-auto mt-16 mb-8 bg-white">
           <CardContent className="pt-8">
-            {renderContent()}
+            {renderDashboardContent()}
           </CardContent>
         </Card>
       </div>
