@@ -8,9 +8,12 @@ const AllUsersTab = ({ handleLocationClick }) => {
   
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">All Users Activity</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">All Users Activity</h2>
+      </div>
+      
       <Tabs defaultValue="today" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-8">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="today">Today</TabsTrigger>
           <TabsTrigger value="week">This Week</TabsTrigger>
           <TabsTrigger value="month">This Month</TabsTrigger>
@@ -19,7 +22,7 @@ const AllUsersTab = ({ handleLocationClick }) => {
 
         {['today', 'week', 'month', 'all'].map((period) => (
           <TabsContent key={period} value={period}>
-            <ScrollArea className="h-[600px]">
+            <ScrollArea className="h-[600px] w-full">
               <AllUsersClockingHistory 
                 onLocationClick={handleLocationClick}
                 period={period}
