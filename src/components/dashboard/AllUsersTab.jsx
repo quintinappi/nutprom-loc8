@@ -1,11 +1,8 @@
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import AllUsersClockingHistory from '../AllUsersClockingHistory';
 
 const AllUsersTab = ({ handleLocationClick }) => {
-  console.log('Rendering AllUsersTab');
-  
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -22,12 +19,10 @@ const AllUsersTab = ({ handleLocationClick }) => {
 
         {['today', 'week', 'month', 'all'].map((period) => (
           <TabsContent key={period} value={period}>
-            <ScrollArea className="h-[600px] w-full">
-              <AllUsersClockingHistory 
-                onLocationClick={handleLocationClick}
-                period={period}
-              />
-            </ScrollArea>
+            <AllUsersClockingHistory 
+              onLocationClick={handleLocationClick}
+              period={period}
+            />
           </TabsContent>
         ))}
       </Tabs>
