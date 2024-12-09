@@ -39,7 +39,6 @@ const AllUsersClockingHistory = ({ onLocationClick, period = 'today' }) => {
       try {
         setLoading(true);
         
-        // Calculate start date based on period
         const startDate = new Date();
         startDate.setHours(0, 0, 0, 0);
         
@@ -51,13 +50,11 @@ const AllUsersClockingHistory = ({ onLocationClick, period = 'today' }) => {
             startDate.setMonth(startDate.getMonth() - 1);
             break;
           case 'all':
-            // Set to a past date to get all entries
             startDate.setFullYear(2000);
             break;
-          // 'today' is default, already set
         }
         
-        console.log('Creating query with startDate:', startDate, 'Timestamp:', Timestamp.fromDate(startDate));
+        console.log('Creating query with startDate:', startDate);
         
         const q = query(
           collection(db, 'clock_entries'),
@@ -72,26 +69,21 @@ const AllUsersClockingHistory = ({ onLocationClick, period = 'today' }) => {
             return {
               id: doc.id,
               ...data,
-              timestamp: data.timestamp?.toDate?.() || new Date(data.timestamp)
+              timestamp: data.timestamp?.toDate() || new Date(data.timestamp)
             };
           });
           
           console.log('Processed entries:', entries);
-          
           const processedShifts = processShifts(entries);
           console.log('Final processed shifts:', processedShifts);
           setShifts(processedShifts);
-          setLoading(false);
-        }, (error) => {
-          console.error('Error in shifts snapshot:', error);
-          toast.error('Failed to fetch shifts data');
           setLoading(false);
         });
 
         return unsubscribe;
       } catch (error) {
-        console.error('Error setting up shifts listener:', error);
-        toast.error('Failed to set up shifts listener');
+        console.error('Error in shifts snapshot:', error);
+        toast.error('Failed to fetch shifts data');
         setLoading(false);
       }
     };
@@ -103,54 +95,80 @@ const AllUsersClockingHistory = ({ onLocationClick, period = 'today' }) => {
     console.log('Processing shifts from entries:', entries);
     const userShiftsMap = {};
 
-    // Sort entries by timestamp
-    const sortedEntries = [...entries].sort((a, b) => {
-      const dateA = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
-      const dateB = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
-      return dateA - dateB;
+    // Create a map of latest clock actions per user
+    const latestClockActions = new Map();
+    entries.forEach(entry => {
+      if (!entry.user_id) return;
+      
+      const timestamp = entry.timestamp instanceof Date ? entry.timestamp : new Date(entry.timestamp);
+      
+      if (!latestClockActions.has(entry.user_id) || 
+          timestamp > latestClockActions.get(entry.user_id).timestamp) {
+        latestClockActions.set(entry.user_id, {
+          action: entry.action,
+          timestamp
+        });
+      }
     });
-    
-    sortedEntries.forEach(entry => {
+
+    // Process all entries
+    entries.forEach(entry => {
       if (!entry.user_id) {
         console.warn('Entry missing user_id:', entry);
         return;
       }
 
       if (!userShiftsMap[entry.user_id]) {
+        const latestAction = latestClockActions.get(entry.user_id);
         userShiftsMap[entry.user_id] = {
           userId: entry.user_id,
           shifts: [],
-          currentClockIn: null
+          currentClockIn: null,
+          lastAction: latestAction?.action || 'out'
         };
       }
 
-      const currentUser = userShiftsMap[entry.user_id];
+      const userShifts = userShiftsMap[entry.user_id];
+      const timestamp = entry.timestamp instanceof Date ? entry.timestamp : new Date(entry.timestamp);
 
       if (entry.action === 'in') {
-        currentUser.currentClockIn = entry;
-      } else if (entry.action === 'out' && currentUser.currentClockIn) {
-        currentUser.shifts.push({
-          clockIn: currentUser.currentClockIn.timestamp,
-          clockOut: entry.timestamp,
-          clockInLocation: currentUser.currentClockIn.location,
-          clockOutLocation: entry.location,
-          latitude: currentUser.currentClockIn.latitude,
-          longitude: currentUser.currentClockIn.longitude,
-          clockOutLatitude: entry.latitude,
-          clockOutLongitude: entry.longitude,
-          duration: calculateDuration(
-            currentUser.currentClockIn.timestamp, 
-            entry.timestamp
-          )
-        });
-        currentUser.currentClockIn = null;
+        // Only set as current clock in if this is the latest action
+        const isLatestAction = latestClockActions.get(entry.user_id)?.action === 'in';
+        if (isLatestAction) {
+          userShifts.currentClockIn = {
+            ...entry,
+            timestamp
+          };
+        }
+      } else if (entry.action === 'out') {
+        // Find the matching clock in entry
+        const matchingClockIn = entries.find(e => 
+          e.user_id === entry.user_id && 
+          e.action === 'in' && 
+          new Date(e.timestamp) < timestamp
+        );
+
+        if (matchingClockIn) {
+          const clockInTime = new Date(matchingClockIn.timestamp);
+          userShifts.shifts.push({
+            clockIn: clockInTime,
+            clockOut: timestamp,
+            clockInLocation: matchingClockIn.location,
+            clockOutLocation: entry.location,
+            latitude: matchingClockIn.latitude,
+            longitude: matchingClockIn.longitude,
+            clockOutLatitude: entry.latitude,
+            clockOutLongitude: entry.longitude,
+            duration: calculateDuration(clockInTime, timestamp)
+          });
+        }
       }
     });
 
-    // Add active shifts
+    // Sort shifts by clock in time, most recent first
     Object.values(userShiftsMap).forEach(userData => {
       if (userData.currentClockIn) {
-        userData.shifts.push({
+        userData.shifts.unshift({
           clockIn: userData.currentClockIn.timestamp,
           clockOut: null,
           clockInLocation: userData.currentClockIn.location,
@@ -160,11 +178,10 @@ const AllUsersClockingHistory = ({ onLocationClick, period = 'today' }) => {
           duration: calculateDuration(userData.currentClockIn.timestamp, new Date())
         });
       }
-      // Sort shifts by clock in time, most recent first
-      userData.shifts.sort((a, b) => new Date(b.clockIn) - new Date(a.clockIn));
+      userData.shifts.sort((a, b) => b.clockIn - a.clockIn);
     });
 
-    console.log('Final processed shifts:', userShiftsMap);
+    console.log('Processed shifts map:', userShiftsMap);
     return userShiftsMap;
   };
 
@@ -172,7 +189,7 @@ const AllUsersClockingHistory = ({ onLocationClick, period = 'today' }) => {
     const start = new Date(startTime);
     const end = endTime ? new Date(endTime) : new Date();
     const durationInHours = (end - start) / (1000 * 60 * 60);
-    return durationInHours > 0 ? durationInHours : null;
+    return durationInHours > 0 ? durationInHours : 0;
   };
 
   const getUserName = (userId) => {
@@ -185,15 +202,18 @@ const AllUsersClockingHistory = ({ onLocationClick, period = 'today' }) => {
     return 'Unknown User';
   };
 
-  const formatLocation = (fullLocation) => {
-    console.log('Formatting location:', fullLocation); // Debug log
-    if (!fullLocation || typeof fullLocation !== 'string') {
-      console.log('Invalid location data:', fullLocation); // Debug log
-      return 'N/A';
+  const formatLocation = (location) => {
+    console.log('Formatting location:', location);
+    if (!location) return 'N/A';
+    
+    if (typeof location === 'string') {
+      const parts = location.split(',');
+      return parts[0].split('Ward')[0].split('Local Municipality')[0].trim() || 'N/A';
+    } else if (location.latitude && location.longitude) {
+      return `${location.latitude}, ${location.longitude}`;
     }
-    const parts = fullLocation.split(',');
-    const location = parts[0].split('Ward')[0].split('Local Municipality')[0].trim();
-    return location || 'N/A';
+    
+    return 'N/A';
   };
 
   const handleLocationClick = (shift) => {
@@ -212,11 +232,11 @@ const AllUsersClockingHistory = ({ onLocationClick, period = 'today' }) => {
   };
 
   const getUserStatus = (userData) => {
-    const hasActiveShift = userData.shifts.some(shift => !shift.clockOut);
+    const isOnDuty = userData.lastAction === 'in';
     return {
-      isOnDuty: hasActiveShift,
-      text: hasActiveShift ? 'On Duty' : 'Off Duty',
-      className: hasActiveShift ? 'bg-green-50' : 'bg-red-50'
+      isOnDuty,
+      text: isOnDuty ? 'On Duty' : 'Off Duty',
+      className: isOnDuty ? 'bg-green-50' : 'bg-red-50'
     };
   };
 
@@ -256,6 +276,7 @@ const AllUsersClockingHistory = ({ onLocationClick, period = 'today' }) => {
         formatDuration={calculateDuration}
         formatLocation={formatLocation}
         handleLocationClick={handleLocationClick}
+        activeView={period}
       />
     </div>
   );
