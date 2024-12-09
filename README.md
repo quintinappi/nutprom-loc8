@@ -71,6 +71,10 @@ We don't support custom domains (yet). If you want to deploy your project under 
 
 ## Time Tracking System
 
+# NutPro Time Tracking System
+
+> **Important**: The main application is currently maintained on the `3rd` branch. Please make sure to use this branch for the latest version of the application.
+
 The NutPro time tracking system provides comprehensive clock-in/out functionality with the following features:
 
 ### Shift Processing & Display
