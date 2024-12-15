@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, where, getDocs, limit } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, where, getDocs, limit, writeBatch, doc } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from 'sonner';
 import { addOfflineClockEntry, getOfflineClockEntries, removeOfflineClockEntry } from '../utils/offlineSync';
-import ClockingTable from './ClockingTable';
 import ClockingLogic from './ClockingLogic';
 
 const ClockingSystem = ({ 
@@ -19,10 +16,10 @@ const ClockingSystem = ({
   onStatusUpdate,
   hideHeader = false 
 }) => {
-  const [clockEntries, setClockEntries] = useState([]);
   const [currentStatus, setCurrentStatus] = useState(null);
   const [location, setLocation] = useState(null);
   const [locationWarning, setLocationWarning] = useState(null);
+  const [isLeaveDay, setIsLeaveDay] = useState(false);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -48,140 +45,155 @@ const ClockingSystem = ({
   }, []);
 
   useEffect(() => {
-    fetchClockEntries();
+    // Listen for leave day changes in real-time
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const leaveQuery = query(
+      collection(db, 'clock_entries'),
+      where('user_id', '==', userId),
+      where('timestamp', '>=', today.toISOString()),
+      where('timestamp', '<', tomorrow.toISOString()),
+      where('isLeaveDay', '==', true)
+    );
+
+    const unsubscribe = onSnapshot(leaveQuery, (snapshot) => {
+      setIsLeaveDay(!snapshot.empty);
+    }, (error) => {
+      console.error('Error in leave day updates:', error);
+      toast.error("Failed to get leave day status updates");
+    });
+
+    return () => unsubscribe();
+  }, [userId]);
+
+  useEffect(() => {
     const unsubscribe = onSnapshot(
-      query(collection(db, 'clock_entries'), where('user_id', '==', userId), orderBy('timestamp', 'desc')),
-      fetchClockEntries,
+      query(collection(db, 'clock_entries'), where('user_id', '==', userId), orderBy('timestamp', 'desc'), limit(1)),
+      async (snapshot) => {
+        if (!snapshot.empty) {
+          const lastEntry = snapshot.docs[0].data();
+          const status = lastEntry.action === 'in' ? 'Clocked In' : 'Clocked Out';
+          setCurrentStatus(status);
+          if (onStatusUpdate) {
+            onStatusUpdate(status);
+          }
+        } else {
+          setCurrentStatus('Clocked Out');
+          if (onStatusUpdate) {
+            onStatusUpdate('Clocked Out');
+          }
+        }
+      },
       (error) => {
         console.error('Error in realtime updates:', error);
         toast.error("Failed to get realtime updates. Please refresh the page.");
       }
     );
     return unsubscribe;
-  }, [userId]);
+  }, [userId, onStatusUpdate]);
 
-  const fetchClockEntries = async () => {
+  const handleClockAction = async (action) => {
     try {
       setIsLoading(true);
-      const q = query(collection(db, 'clock_entries'), where('user_id', '==', userId), orderBy('timestamp', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const entries = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      const offlineEntries = await getOfflineClockEntries();
-      const allEntries = [...entries, ...offlineEntries].sort((a, b) => 
-        new Date(b.timestamp) - new Date(a.timestamp)
-      );
 
-      const uniqueEntries = removeDuplicates(allEntries);
-      setClockEntries(uniqueEntries);
-      updateCurrentStatus(uniqueEntries);
+      const clockEntry = await ClockingLogic.createClockEntry(userId, action, location);
+
+      if (isOnline) {
+        await addDoc(collection(db, 'clock_entries'), clockEntry);
+        toast.success(`Successfully clocked ${action}`);
+      } else {
+        await addOfflineClockEntry(clockEntry);
+        toast.success(`Clocked ${action} (offline mode)`);
+      }
+
+      if (onClockAction) {
+        onClockAction(action);
+      }
     } catch (error) {
-      console.error('Error fetching clock entries:', error);
-      toast.error("Failed to load clock entries. Please try again.");
+      console.error('Error clocking in/out:', error);
+      toast.error(`Failed to clock ${action}. Please try again.`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const removeDuplicates = (entries) => {
-    const uniqueMap = new Map();
-    entries.forEach(entry => {
-      const key = `${entry.user_id}-${entry.action}-${entry.timestamp}`;
-      if (!uniqueMap.has(key) || !uniqueMap.get(key).id) {
-        uniqueMap.set(key, entry);
-      }
-    });
-    return Array.from(uniqueMap.values());
-  };
-
-  const updateCurrentStatus = (entries) => {
-    if (entries.length > 0) {
-      const lastEntry = entries[0];
-      setCurrentStatus(lastEntry.action === 'in' ? 'Clocked In' : 'Clocked Out');
-      onStatusUpdate(lastEntry.action === 'in' ? 'Clocked In' : 'Clocked Out', calculateDuration(lastEntry));
-    } else {
-      setCurrentStatus('Not Clocked In');
-      onStatusUpdate('Not Clocked In', 0);
-    }
-  };
-
-  const calculateDuration = (lastEntry) => {
-    if (lastEntry.action === 'in') {
-      const clockInTime = new Date(lastEntry.timestamp);
-      const now = new Date();
-      return (now - clockInTime) / (1000 * 60 * 60); // Convert to hours
-    }
-    return 0;
-  };
-
-  const handleClock = async (action) => {
-    if (!userId) return;
-    
+  const handleBookLeave = async () => {
     try {
       setIsLoading(true);
-      const clockEntry = await ClockingLogic.createClockEntry(userId, action, location);
-      
+
+      const leaveEntries = await ClockingLogic.createLeaveDay(userId);
+
       if (isOnline) {
-        await addDoc(collection(db, 'clock_entries'), clockEntry);
+        const batch = writeBatch(db);
+        leaveEntries.forEach(entry => {
+          const docRef = doc(collection(db, 'clock_entries'));
+          batch.set(docRef, entry);
+        });
+        await batch.commit();
+        setIsLeaveDay(true);
+        toast.success('Leave day booked successfully');
       } else {
-        await addOfflineClockEntry(clockEntry);
+        for (const entry of leaveEntries) {
+          await addOfflineClockEntry(entry);
+        }
+        setIsLeaveDay(true);
+        toast.success('Leave day booked (offline mode)');
       }
 
-      setCurrentStatus(action === 'in' ? 'Clocked In' : 'Clocked Out');
-      onClockAction(action);
-      
-      const successMessage = isOnline
-        ? `Successfully clocked ${action}`
-        : `Clocked ${action} (saved offline)`;
-      toast.success(successMessage);
-
-      if (!location) {
-        toast.warning("Clocked without location data. Please enable location services if possible.");
+      if (onClockAction) {
+        onClockAction('leave');
       }
-
     } catch (error) {
-      console.error('Error clocking in/out:', error);
-      toast.error("Failed to clock in/out. Please try again.");
+      console.error('Error booking leave:', error);
+      toast.error('Failed to book leave. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div>
-      {!hideHeader && <h2 className="text-2xl font-bold mb-4">Clocking System</h2>}
-      <div className="space-y-4">
-        <div className="flex justify-center mb-6 space-x-4">
-          {currentStatus === 'Clocked Out' || currentStatus === 'Not Clocked In' ? (
-            <Button onClick={() => handleClock('in')} size="lg" className="px-8 py-4 text-lg">
-              Clock In
-            </Button>
-          ) : (
-            <Button onClick={() => handleClock('out')} size="lg" className="px-8 py-4 text-lg">
-              Clock Out
-            </Button>
-          )}
+    <div className="space-y-4">
+      {locationWarning && (
+        <Alert variant="warning">
+          <AlertDescription>{locationWarning}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="flex flex-col items-center space-y-4">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold">
+            Current Status: {isLeaveDay ? 'Leave Day Booked' : currentStatus}
+          </h2>
         </div>
-        {currentStatus && (
-          <Alert className="mb-4">
-            <AlertDescription>Current Status: {currentStatus}</AlertDescription>
-          </Alert>
-        )}
-        {locationWarning && (
-          <Alert variant="warning" className="mb-4">
-            <AlertDescription>{locationWarning}</AlertDescription>
-          </Alert>
-        )}
-        <Accordion type="single" collapsible className="w-full">
-          <AccordionItem value="clock-history">
-            <AccordionTrigger className="text-xl font-semibold">My clocking history</AccordionTrigger>
-            <AccordionContent>
-              <ClockingTable entries={clockEntries} />
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+        <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+          <Button
+            size="lg"
+            onClick={() => handleClockAction('in')}
+            disabled={currentStatus === 'Clocked In' || isLeaveDay}
+            className="w-32"
+          >
+            Clock In
+          </Button>
+          <Button
+            size="lg"
+            onClick={() => handleClockAction('out')}
+            disabled={currentStatus === 'Clocked Out' || isLeaveDay}
+            className="w-32"
+          >
+            Clock Out
+          </Button>
+          <Button
+            size="lg"
+            onClick={handleBookLeave}
+            disabled={isLeaveDay}
+            className="w-32"
+          >
+            Book Leave
+          </Button>
+        </div>
       </div>
     </div>
   );

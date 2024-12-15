@@ -2,6 +2,7 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 import { auth, db } from './config';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { BrowserRouter, useNavigate } from 'react-router-dom';
 
 const FirebaseAuthContext = createContext();
 
@@ -9,6 +10,7 @@ export const FirebaseAuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -22,15 +24,22 @@ export const FirebaseAuthProvider = ({ children }) => {
         }
       } else {
         setUserRole(null);
+        navigate('/login'); // Redirect to login page when user is null
       }
       setLoading(false);
     });
 
     return unsubscribe;
-  }, []);
+  }, [navigate]);
 
   const login = async (email, password) => {
-    return signInWithEmailAndPassword(auth, email, password);
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      navigate('/');
+      return result;
+    } catch (error) {
+      throw error;
+    }
   };
 
   const signup = async (email, password) => {
@@ -39,11 +48,20 @@ export const FirebaseAuthProvider = ({ children }) => {
       email: email,
       role: 'user' // Default role for new users
     });
+    navigate('/');
     return userCredential;
   };
 
-  const logout = () => {
-    return signOut(auth);
+  const logout = async () => {
+    try {
+      console.log('Firebase: Starting logout process');
+      await signOut(auth);
+      console.log('Firebase: Logout successful');
+      navigate('/login');
+    } catch (error) {
+      console.error('Firebase: Logout failed:', error);
+      throw error;
+    }
   };
 
   const value = {
@@ -119,3 +137,15 @@ export const FirebaseAuthUI = () => {
     </form>
   );
 };
+
+const App = () => {
+  return (
+    <BrowserRouter>
+      <FirebaseAuthProvider>
+        {/* Your app components here */}
+      </FirebaseAuthProvider>
+    </BrowserRouter>
+  );
+};
+
+export default App;

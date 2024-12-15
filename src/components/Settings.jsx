@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useFirebaseAuth } from '../firebase/auth';
-import { db } from '../firebase/config';
+import { db, auth } from '../firebase/config';
 import { doc, getDoc, updateDoc, getDocs, collection, writeBatch } from 'firebase/firestore';
+import { updateEmail, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,7 @@ import ImageUpload from './ImageUpload';
 import { toast } from 'sonner';
 import ResetAppButton from './ResetAppButton';
 import Navbar from './Navbar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 const Settings = ({ onProfileUpdate = () => {}, setIsLoading = () => {} }) => {
   const { user, logout } = useFirebaseAuth();
@@ -18,6 +20,10 @@ const Settings = ({ onProfileUpdate = () => {}, setIsLoading = () => {} }) => {
   const [userRole, setUserRole] = useState('');
   const [activeTab, setActiveTab] = useState('settings');
   const [localLoading, setLocalLoading] = useState(false);
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [emailError, setEmailError] = useState(null);
 
   useEffect(() => {
     fetchUserProfile();
@@ -37,6 +43,7 @@ const Settings = ({ onProfileUpdate = () => {}, setIsLoading = () => {} }) => {
             avatar_url: userData.avatar_url || null
           });
           setUserRole(userData.role || 'user');
+          setNewEmail(user.email || '');
         }
       } catch (error) {
         console.error('Error fetching profile:', error);
@@ -73,31 +80,34 @@ const Settings = ({ onProfileUpdate = () => {}, setIsLoading = () => {} }) => {
     setProfile({ ...profile, [e.target.name]: e.target.value });
   };
 
-  const handleClockingCleanup = async () => {
+  const handleEmailUpdate = async (e) => {
+    e.preventDefault();
+    setEmailError(null);
+    
     try {
-      setIsLoading(true);
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-      const userIds = new Set(usersSnapshot.docs.map(doc => doc.id));
+      setLocalLoading(true);
+      // Re-authenticate user
+      const credential = EmailAuthProvider.credential(user.email, password);
+      await reauthenticateWithCredential(user, credential);
 
-      const clockEntriesSnapshot = await getDocs(collection(db, 'clock_entries'));
-      const batch = writeBatch(db);
-      let deletedCount = 0;
+      // Update email in Firebase Auth
+      await updateEmail(user, newEmail);
 
-      clockEntriesSnapshot.forEach(doc => {
-        const entry = doc.data();
-        if (!userIds.has(entry.user_id)) {
-          batch.delete(doc.ref);
-          deletedCount++;
-        }
+      // Update email in Firestore
+      const userDocRef = doc(db, 'users', user.uid);
+      await updateDoc(userDocRef, {
+        email: newEmail
       });
 
-      await batch.commit();
-      toast.success(`Cleanup completed. Deleted ${deletedCount} orphaned clock entries.`);
+      toast.success('Email updated successfully');
+      setIsEmailDialogOpen(false);
+      setPassword('');
     } catch (error) {
-      console.error('Error during clocking cleanup:', error);
-      toast.error('Failed to complete clocking cleanup');
+      console.error('Error updating email:', error);
+      setEmailError(error.message);
+      toast.error('Failed to update email');
     } finally {
-      setIsLoading(false);
+      setLocalLoading(false);
     }
   };
 
@@ -112,32 +122,81 @@ const Settings = ({ onProfileUpdate = () => {}, setIsLoading = () => {} }) => {
       <div className="container mx-auto p-4 flex-grow">
         <Card className="mx-auto mt-16 mb-8 bg-white">
           <CardHeader className="text-center">
-            <div className="flex flex-col items-center mb-6">
-              <Avatar className="w-24 h-24 mb-4">
-                <AvatarImage src={profile.avatar_url} alt={`${profile.name} ${profile.surname}`} className="object-cover" />
-                <AvatarFallback>{profile.name?.charAt(0)}{profile.surname?.charAt(0)}</AvatarFallback>
-              </Avatar>
-              <CardTitle>Settings</CardTitle>
-            </div>
+            <CardTitle>Settings</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Name</Label>
-                <Input id="name" name="name" value={profile.name} onChange={handleInputChange} />
-              </div>
-              <div>
-                <Label htmlFor="surname">Surname</Label>
-                <Input id="surname" name="surname" value={profile.surname} onChange={handleInputChange} />
-              </div>
-              <div>
-                <Label>Profile Picture</Label>
+              <div className="flex flex-col items-center mb-6">
+                <Avatar className="w-24 h-24 mb-4">
+                  <AvatarImage src={profile.avatar_url} alt={`${profile.name} ${profile.surname}`} className="object-cover" />
+                  <AvatarFallback>{profile.name?.charAt(0)}{profile.surname?.charAt(0)}</AvatarFallback>
+                </Avatar>
                 <ImageUpload 
                   onImageSelected={(url) => setProfile({ ...profile, avatar_url: url })} 
                   currentImage={profile.avatar_url}
                   setIsLoading={setIsLoading}
                 />
               </div>
+
+              <div>
+                <Label htmlFor="name">Name</Label>
+                <Input id="name" name="name" value={profile.name} onChange={handleInputChange} />
+              </div>
+
+              <div>
+                <Label htmlFor="surname">Surname</Label>
+                <Input id="surname" name="surname" value={profile.surname} onChange={handleInputChange} />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Email</Label>
+                    <p className="text-sm text-muted-foreground">{user?.email}</p>
+                  </div>
+                  <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        Update Email
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Update Email Address</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleEmailUpdate} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="newEmail">New Email</Label>
+                          <Input
+                            id="newEmail"
+                            type="email"
+                            value={newEmail}
+                            onChange={(e) => setNewEmail(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="password">Current Password</Label>
+                          <Input
+                            id="password"
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                          />
+                        </div>
+                        {emailError && (
+                          <p className="text-sm text-red-500">{emailError}</p>
+                        )}
+                        <Button type="submit" className="w-full" disabled={localLoading}>
+                          Update Email
+                        </Button>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+
               <Button 
                 onClick={handleProfileUpdate} 
                 className="w-full"
@@ -147,17 +206,9 @@ const Settings = ({ onProfileUpdate = () => {}, setIsLoading = () => {} }) => {
               </Button>
               
               {userRole === 'admin' && (
-                <>
+                <div className="pt-4">
                   <ResetAppButton setIsLoading={setIsLoading} />
-                  <Button 
-                    onClick={handleClockingCleanup} 
-                    variant="outline" 
-                    className="w-full"
-                    disabled={localLoading}
-                  >
-                    Cleanup Orphaned Clock Entries
-                  </Button>
-                </>
+                </div>
               )}
             </div>
           </CardContent>

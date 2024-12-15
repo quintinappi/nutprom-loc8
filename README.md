@@ -1,121 +1,151 @@
-# Welcome to your GPT Engineer project
-
-## Project info
-
-**Project**: clockify-journey
-
-**URL**: https://run.gptengineer.app/projects/d69493ab-b227-48e9-b01e-24779f411153/improve
-
-**Version**: 5.0
-
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use GPT Engineer**
-
-Simply visit the GPT Engineer project at [GPT Engineer](https://gptengineer.app/projects/d69493ab-b227-48e9-b01e-24779f411153/improve) and start prompting.
-
-Changes made via gptengineer.app will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in the GPT Engineer UI.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-git clone https://github.com/GPT-Engineer-App/clockify-journey.git
-cd clockify-journey
-npm i
-
-# This will run a dev server with auto reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- React
-- shadcn-ui
-- Tailwind CSS
-- Firebase
-
-## How can I deploy this project?
-
-All GPT Engineer projects can be deployed directly via the GPT Engineer app.
-
-Simply visit your project at [GPT Engineer](https://gptengineer.app/projects/d69493ab-b227-48e9-b01e-24779f411153/improve) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify or GitHub pages. Visit our docs for more details: [Custom domains](https://docs.gptengineer.app/tips-tricks/custom-domain/)
-
-## Time Tracking System
-
 # NutPro Time Tracking System
 
-> **Important**: The main application is currently maintained on the `3rd` branch. Please make sure to use this branch for the latest version of the application.
+## Overview
 
-The NutPro time tracking system provides comprehensive clock-in/out functionality with the following features:
+NutPro Time Tracking is a comprehensive employee time management system built with React and Firebase, featuring real-time updates, location tracking, and advanced leave management.
 
-### Shift Processing & Display
-- **Time Periods**: Users can view shifts across different time periods:
-  - Today: Shows shifts from 00:00 of the current day
-  - This Week: Shows shifts from the past 7 days
-  - This Month: Shows shifts from the past 30 days
-  - All Time: Shows complete shift history
+## Core Features
 
-- **Status Determination**:
-  - User status (On Duty/Not on Duty) is determined by their most recent clock action
-  - Status is calculated by sorting all clock entries by timestamp and checking the latest action
-  - A user is considered "On Duty" if their most recent action is "clock in"
-  - The status is reflected in both personal and all-users views
+### Clock In/Out System
+- Real-time clock in/out functionality
+- Location tracking for each clock action
+- Automatic status updates (On Duty/Not on Duty)
+- Offline mode support with automatic sync
+- Leave day booking system
 
-- **Duration Calculation**:
-  - Shift duration is calculated as the time difference between clock-in and clock-out
-  - For active shifts (no clock-out), duration is calculated up to the current time
-  - Duration is displayed in hours and minutes format (e.g., "2h 30m")
-  - Durations are automatically updated for active shifts
+### Shift Management
+- View shifts by different time periods (Today/Week/Month/All Time)
+- Real-time shift duration calculations
+- Location history for each shift
+- Shift type tracking (Regular/Leave Day)
+- Shift deletion capability (Admin only)
 
-- **Location Tracking**:
-  - Each clock action records the user's location
-  - Locations are displayed in a simplified format (ward/area name)
-  - Full location details are available on click
-  - Location history is maintained for both clock-in and clock-out actions
+### Data Export
+- CSV export functionality
+- Customizable date ranges
+- Includes shift types, durations, and locations
+- Automatic handling of missing days
+- Comment support for manual annotations
 
-### Implementation Details
-- Timestamps are stored in ISO format for consistency across timezones
-- Real-time updates using Firebase Firestore snapshots
-- Consistent shift processing logic across personal and all-users views
-- Efficient filtering using Firestore queries for different time periods
+## Technical Implementation
 
-## Changelog
+### Authentication & Authorization
+- Firebase Authentication for user management
+- Role-based access control (Admin/Regular User)
+- Secure data access patterns
+
+### Data Storage (Firebase)
+- Clock entries structure:
+  ```javascript
+  {
+    user_id: string,
+    action: 'in' | 'out',
+    timestamp: ISO string,
+    location: string,
+    latitude: number | null,
+    longitude: number | null,
+    isLeaveDay: boolean
+  }
+  ```
+
+### Real-time Updates
+- Live status updates using Firestore snapshots
+- Automatic UI updates on data changes
+- Efficient query patterns for real-time data
+
+### Location Handling
+- Geolocation API integration
+- Reverse geocoding for human-readable locations
+- Fallback handling for unavailable location services
+
+### Offline Support
+- Local storage for offline clock actions
+- Automatic synchronization when online
+- Conflict resolution strategies
+
+## Recent Updates (December 9, 2024)
+
+### Leave Day Management Improvements
+1. Enhanced Leave Day Status
+   - Real-time leave day status tracking
+   - Clear UI indication when leave is booked
+   - Automatic status updates on leave day changes
+
+2. Leave Day Validation
+   - Prevention of double-booking leave days
+   - Blocking clock actions on leave days
+   - Admin-only leave day deletion
+
+3. Error Handling
+   - Clear error messages for leave day conflicts
+   - Improved feedback for unauthorized actions
+   - Real-time status synchronization after admin actions
+
+### Technical Improvements
+1. Real-time Listeners
+   - Implemented real-time leave day status tracking
+   - Improved state management for leave days
+   - Enhanced deletion handling
+
+2. Status Management
+   - Unified status display across components
+   - Improved status accuracy after admin actions
+   - Better handling of edge cases
+
+3. UI/UX Enhancements
+   - Clearer status indicators
+   - Disabled actions during leave days
+   - Improved error messaging
+
+## Usage Guidelines
+
+### For Users
+1. Clock In/Out
+   - Use the main buttons to clock in/out
+   - Ensure location services are enabled
+   - Check current status before actions
+
+2. Leave Management
+   - Book leave using the "Book Leave" button
+   - Cannot clock in/out on leave days
+   - Contact admin to cancel leave bookings
+
+3. Viewing History
+   - Use period tabs to view different timeframes
+   - Check shift details in the history view
+   - Export data as needed
+
+### For Administrators
+1. User Management
+   - View all users' clock history
+   - Delete incorrect entries as needed
+   - Manage leave day bookings
+
+2. Data Management
+   - Export user data via CSV
+   - Review and manage shift entries
+   - Handle leave day cancellations
+
+## Maintenance Notes
+
+- Regular database cleanup recommended
+- Monitor storage usage for location data
+- Check for offline data synchronization issues
+- Review error logs for system health
+
+## Version History
+
+### Version 6.0 (December 9, 2024)
+- Implemented comprehensive leave day management
+- Added real-time leave status tracking
+- Improved error handling and user feedback
+- Enhanced admin controls for leave management
 
 ### Version 5.0
-- Second deployment to client
-- Added "Last Shift Hours" display under total hours in UserShifts component
-- Various bug fixes and performance improvements
+- Added "Last Shift Hours" display
+- Various bug fixes and improvements
 
 ### Version 3.0
-- Fixed duplicate entries issue in Clock History
-- Improved overall stability and performance
-- Deployed to the client
+- Initial stable release
+- Basic clock in/out functionality
+- Location tracking implementation

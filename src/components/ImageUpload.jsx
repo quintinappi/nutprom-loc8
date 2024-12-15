@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from 'sonner';
 import { useFirebaseAuth } from '../firebase/auth';
 
-const ImageUpload = ({ onImageSelected, currentImage, setIsLoading }) => {
+const ImageUpload = ({ onImageSelected, setIsLoading }) => {
   const [uploading, setUploading] = useState(false);
   useFirebaseAuth();
 
@@ -86,13 +86,6 @@ const ImageUpload = ({ onImageSelected, currentImage, setIsLoading }) => {
 
   return (
     <div className="flex flex-col items-center gap-4">
-      {currentImage && (
-        <img 
-          src={currentImage} 
-          alt="Profile" 
-          className="w-32 h-32 rounded-full object-cover"
-        />
-      )}
       <Button 
         variant="outline" 
         disabled={uploading}

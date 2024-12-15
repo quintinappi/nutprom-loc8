@@ -125,7 +125,9 @@ const AllUsersClockingHistory = ({ onLocationClick, period = 'today' }) => {
         if (entry.action === 'in') {
           clockInEntry = entry;
         } else if (entry.action === 'out' && clockInEntry) {
+          const isLeaveDay = clockInEntry.location === 'Leave Day' || entry.location === 'Leave Day';
           shifts.push({
+            id: clockInEntry.id,
             clockIn: clockInEntry.timestamp,
             clockOut: entry.timestamp,
             clockInLocation: clockInEntry.location || 'Location not available',
@@ -134,7 +136,9 @@ const AllUsersClockingHistory = ({ onLocationClick, period = 'today' }) => {
             longitude: clockInEntry.longitude,
             clockOutLatitude: entry.latitude,
             clockOutLongitude: entry.longitude,
-            duration: calculateDuration(clockInEntry.timestamp, entry.timestamp)
+            duration: calculateDuration(clockInEntry.timestamp, entry.timestamp),
+            type: isLeaveDay ? 'Leave Day' : 'Regular',
+            outEntryId: entry.id
           });
           clockInEntry = null;
         }
@@ -142,14 +146,17 @@ const AllUsersClockingHistory = ({ onLocationClick, period = 'today' }) => {
 
       // Handle active clock-in
       if (clockInEntry) {
+        const isLeaveDay = clockInEntry.location === 'Leave Day';
         shifts.push({
+          id: clockInEntry.id,
           clockIn: clockInEntry.timestamp,
           clockOut: null,
           clockInLocation: clockInEntry.location || 'Location not available',
           clockOutLocation: null,
           latitude: clockInEntry.latitude,
           longitude: clockInEntry.longitude,
-          duration: calculateDuration(clockInEntry.timestamp, new Date())
+          duration: calculateDuration(clockInEntry.timestamp, new Date()),
+          type: isLeaveDay ? 'Leave Day' : 'Regular'
         });
       }
 

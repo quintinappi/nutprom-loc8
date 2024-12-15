@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, where, getDocs, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db, auth } from '../firebase/config';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,6 +10,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from 'sonner';
 import Navbar from './Navbar';
 import { useFirebaseAuth } from '../firebase/auth';
+import { KeyRound } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const UserManagement = ({ onUserDeleted }) => {
   const [users, setUsers] = useState([]);
@@ -92,6 +105,16 @@ const UserManagement = ({ onUserDeleted }) => {
     }
   };
 
+  const handleResetPassword = async (email) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast.success('Password reset email sent successfully');
+    } catch (error) {
+      console.error('Error sending reset email:', error);
+      toast.error('Failed to send password reset email');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-200 flex flex-col">
       <Navbar 
@@ -168,13 +191,39 @@ const UserManagement = ({ onUserDeleted }) => {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(user.id)}
-                      >
-                        Delete
-                      </Button>
+                      <div className="flex gap-2">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <KeyRound className="h-4 w-4 mr-2" />
+                              Reset
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Reset Password</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will send a password reset email to {user.email}. The user will need to click the link in the email to set a new password.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleResetPassword(user.email)}
+                              >
+                                Send Reset Email
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDelete(user.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

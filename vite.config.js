@@ -15,11 +15,19 @@ export default defineConfig(({ mode }) => ({
   },
   server: {
     port: 8080,
-    host: "::"
+    host: "::",
+    historyApiFallback: true
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
-    mode: 'development'
+    sourcemap: mode === 'development',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore']
+        }
+      }
+    }
   }
 }))

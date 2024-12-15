@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Clock, Users, Menu, X, Settings as SettingsIcon, BarChart, FileDown } from 'lucide-react';
+import { Clock, Users, Menu, X, Settings as SettingsIcon, BarChart, FileDown, ClipboardList } from 'lucide-react';
 import { useMediaQuery } from '@react-hook/media-query';
 import Logo from './Logo';
 import { Link } from 'react-router-dom';
@@ -26,8 +26,9 @@ const Navbar = ({ onLogout, activeTab, setActiveTab, userRole }) => {
     { id: 'clock', label: 'Clock In/Out', icon: <Clock className="h-4 w-4" />, show: true, to: '/' },
     { id: 'total-hours', label: 'Total Hours', icon: <BarChart className="h-4 w-4" />, show: true, to: '/total-hours' },
     { id: 'users', label: 'Manage Users', icon: <Users className="h-4 w-4" />, show: userRole === 'admin', to: '/users' },
+    { id: 'timesheet', label: 'Timesheets', icon: <ClipboardList className="h-4 w-4" />, show: userRole === 'admin', to: '/timesheet' },
     { id: 'settings', label: 'Settings', icon: <SettingsIcon className="h-4 w-4" />, show: true, to: '/settings' },
-    { id: 'export-csv', label: 'Export CSV', icon: <FileDown className="h-4 w-4" />, show: true, to: '/export-csv' },
+    { id: 'export-csv', label: 'Export CSV', icon: <FileDown className="h-4 w-4" />, show: userRole === 'admin', to: '/export-csv' },
   ];
 
   const handleSetActiveTab = (tabId) => {
@@ -63,7 +64,15 @@ const Navbar = ({ onLogout, activeTab, setActiveTab, userRole }) => {
                   {item.label}
                 </NavItem>
               ))}
-              <Button onClick={onLogout} variant="outline">
+              <Button onClick={async () => {
+                try {
+                  console.log('Attempting to logout...');
+                  await onLogout();
+                  console.log('Logout successful');
+                } catch (error) {
+                  console.error('Logout failed:', error);
+                }
+              }} variant="outline">
                 Logout
               </Button>
             </div>
@@ -86,7 +95,15 @@ const Navbar = ({ onLogout, activeTab, setActiveTab, userRole }) => {
               {item.label}
             </NavItem>
           ))}
-          <Button onClick={onLogout} variant="outline" className="w-full justify-start">
+          <Button onClick={async () => {
+            try {
+              console.log('Attempting to logout...');
+              await onLogout();
+              console.log('Logout successful');
+            } catch (error) {
+              console.error('Logout failed:', error);
+            }
+          }} variant="outline" className="w-full justify-start">
             Logout
           </Button>
         </div>

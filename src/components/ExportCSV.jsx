@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { format } from 'date-fns';
 
 const ExportCSV = () => {
   const [startDate, setStartDate] = useState('');
@@ -56,32 +57,110 @@ const ExportCSV = () => {
   }, [clockEntries]);
 
   const pairClockEntries = (entries) => {
+    console.log('Raw entries:', entries);
     const sortedEntries = entries.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     const shifts = [];
-    let currentShift = null;
+    const entriesByDay = {};
 
+    // Group entries by day
     sortedEntries.forEach(entry => {
-      if (entry.action === 'in' && !currentShift) {
-        currentShift = { clockIn: entry.timestamp, user: entry.user };
-      } else if (entry.action === 'out' && currentShift) {
-        currentShift.clockOut = entry.timestamp;
-        shifts.push(currentShift);
-        currentShift = null;
+      const date = format(new Date(entry.timestamp), 'yyyy-MM-dd');
+      if (!entriesByDay[date]) {
+        entriesByDay[date] = [];
+      }
+      entriesByDay[date].push(entry);
+    });
+
+    // Process each day's entries
+    Object.entries(entriesByDay).forEach(([date, dayEntries]) => {
+      // Check if any entry is a leave day
+      const isLeaveDay = dayEntries.some(entry => entry.type === 'Leave Day' || entry.isLeaveDay);
+      
+      if (isLeaveDay) {
+        // Use the first leave day entry if available
+        const leaveEntry = dayEntries.find(entry => entry.type === 'Leave Day' || entry.isLeaveDay);
+        shifts.push({
+          clockIn: leaveEntry.timestamp,
+          clockOut: leaveEntry.timestamp,
+          duration: calculateDuration(leaveEntry.timestamp, leaveEntry.timestamp),
+          user: leaveEntry.user,
+          clockInLocation: 'Leave Day',
+          clockOutLocation: 'Leave Day',
+          isLeaveDay: true
+        });
+        return;
+      }
+
+      // For regular entries, find the longest duration pair
+      let maxDuration = 0;
+      let bestPair = null;
+
+      for (let i = 0; i < dayEntries.length; i++) {
+        const entry = dayEntries[i];
+        if (entry.action === 'in') {
+          // Look ahead for matching out entries
+          for (let j = i + 1; j < dayEntries.length; j++) {
+            const outEntry = dayEntries[j];
+            if (outEntry.action === 'out') {
+              const duration = calculateDuration(entry.timestamp, outEntry.timestamp);
+              if (duration > maxDuration) {
+                maxDuration = duration;
+                bestPair = { in: entry, out: outEntry };
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      if (bestPair) {
+        shifts.push({
+          clockIn: bestPair.in.timestamp,
+          clockOut: bestPair.out.timestamp,
+          duration: maxDuration,
+          user: bestPair.in.user,
+          clockInLocation: bestPair.in.location || 'Location not available',
+          clockOutLocation: bestPair.out.location || 'Location not available',
+          isLeaveDay: false
+        });
       }
     });
 
-    // Add any unpaired clock-ins
-    if (currentShift) {
-      shifts.push(currentShift);
+    // Add missing days
+    const allShifts = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+      const currentDate = new Date(date);
+      const dateStr = format(currentDate, 'yyyy-MM-dd');
+      
+      const existingShift = shifts.find(shift => 
+        format(new Date(shift.clockIn), 'yyyy-MM-dd') === dateStr
+      );
+
+      if (existingShift) {
+        allShifts.push(existingShift);
+      } else {
+        allShifts.push({
+          clockIn: currentDate.toISOString(),
+          clockOut: currentDate.toISOString(),
+          duration: 0,
+          isPlaceholder: true
+        });
+      }
     }
 
-    return shifts;
+    console.log('Final shifts:', allShifts);
+    return allShifts;
   };
 
-  const calculateShiftDuration = (clockIn, clockOut) => {
-    if (!clockOut) return null;
-    const duration = (new Date(clockOut) - new Date(clockIn)) / (1000 * 60 * 60); // in hours
-    return duration.toFixed(2);
+  const calculateDuration = (start, end) => {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const durationMs = endDate.getTime() - startDate.getTime();
+    const hours = durationMs / (1000 * 60 * 60);
+    return Math.max(0, hours); // Ensure duration is not negative
   };
 
   const formatDate = (date) => {
@@ -101,7 +180,7 @@ const ExportCSV = () => {
   };
 
   const exportToCSV = async () => {
-    if (!pairedShifts.length) return;
+    if (!startDate || !endDate) return;
 
     const now = Date.now();
     if (now - lastExportTime < 5000) {
@@ -120,9 +199,26 @@ const ExportCSV = () => {
       const userEmail = selectedUser?.email || 'unknown@email.com';
 
       const csvContent = [
-        ['User Name', 'Surname', 'Email Address', 'Clock In Date', 'Clock In Time', 'Clock Out Date', 'Clock Out Time', 'Duration (hours)'],
+        ['User Name', 'Surname', 'Email Address', 'Clock In Date', 'Clock In Time', 'Clock Out Date', 'Clock Out Time', 'Duration (hours)', 'Shift Type', 'Comment'],
         ...pairedShifts.map(shift => {
-          const duration = calculateShiftDuration(shift.clockIn, shift.clockOut);
+          if (shift.isPlaceholder) {
+            const formattedDate = formatDate(shift.clockIn);
+            return [
+              userName,
+              userSurname,
+              userEmail,
+              formattedDate,
+              '-',
+              formattedDate,
+              '-',
+              '0.00',
+              'No Clock Entry',
+              ''
+            ];
+          }
+
+          const duration = shift.duration.toFixed(2);
+          
           return [
             userName,
             userSurname,
@@ -131,7 +227,9 @@ const ExportCSV = () => {
             formatTime(shift.clockIn),
             shift.clockOut ? formatDate(shift.clockOut) : '',
             shift.clockOut ? formatTime(shift.clockOut) : '',
-            duration || ''
+            duration,
+            shift.isLeaveDay ? 'Leave Day' : 'Regular Shift',
+            ''
           ];
         })
       ].map(row => row.join(',')).join('\n');
@@ -140,17 +238,17 @@ const ExportCSV = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      const fileName = `clock_entries_${userName}_${userSurname}_${startDate}_to_${endDate}.csv`;
+      const fileName = `timesheet_${userName}_${userSurname}_${startDate}_to_${endDate}.csv`;
       link.setAttribute('download', fileName);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      toast.success('CSV file download initiated. Check your downloads folder.');
+      toast.success('Timesheet download initiated. Check your downloads folder.');
     } catch (error) {
-      console.error('Error during CSV export:', error);
-      toast.error('Failed to export CSV. Please try again.');
+      console.error('Error exporting CSV:', error);
+      toast.error('Failed to export timesheet');
     } finally {
       setIsExporting(false);
     }
@@ -216,12 +314,12 @@ const ExportCSV = () => {
           <h3 className="text-lg font-semibold mt-4 mb-2">Shifts to be exported:</h3>
           <ul className="space-y-2">
             {pairedShifts.map((shift, index) => {
-              const duration = calculateShiftDuration(shift.clockIn, shift.clockOut);
+              const duration = shift.duration.toFixed(2);
               return (
                 <li key={index} className="border p-2 rounded">
                   <p>Clock In: {formatDate(shift.clockIn)} {formatTime(shift.clockIn)}</p>
                   <p>Clock Out: {shift.clockOut ? `${formatDate(shift.clockOut)} ${formatTime(shift.clockOut)}` : 'N/A'}</p>
-                  <p>Duration: {duration ? `${duration} hours` : 'N/A'}</p>
+                  <p>Duration: {duration} hours</p>
                 </li>
               );
             })}
