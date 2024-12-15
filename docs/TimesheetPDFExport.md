@@ -321,3 +321,47 @@ interface PDFGenerationLog {
    - Performance tracking
    - Error logging
    - Usage statistics
+
+### 4. Hours Calculation Logic
+
+The system implements a sophisticated hours calculation mechanism that accurately tracks regular and overtime hours:
+
+#### Total Hours Calculation
+- **Regular Hours**: Capped at 9 hours per day
+- **Overtime Hours**: Any hours exceeding 9 hours per day
+- **Calculation Flow**:
+  1. Hours are initially calculated in `TimesheetManager` component
+  2. Totals are passed to `PDFExportButton` component
+  3. `TimesheetPDF` component receives and displays pre-calculated totals
+
+```typescript
+interface TimesheetTotals {
+  total_hours: number;    // Sum of all hours
+  regular_hours: number;  // Hours capped at 9 per day
+  overtime_hours: number; // Hours exceeding 9 per day
+}
+```
+
+### 5. Implementation Details
+
+#### Components Interaction
+1. **TimesheetManager**
+   - Calculates totals based on timesheet entries
+   - Manages state for regular and overtime hours
+   - Passes totals to PDFExportButton
+
+2. **PDFExportButton**
+   - Receives calculated totals
+   - Handles PDF generation trigger
+   - Passes data to TimesheetPDF
+
+3. **TimesheetPDF**
+   - Renders PDF layout with company branding
+   - Displays pre-calculated totals
+   - Formats numbers to 2 decimal places
+
+#### Key Features
+- Dynamic calculation of regular and overtime hours
+- Consistent totals across UI and PDF export
+- Automated validation of hours
+- Error handling for invalid entries
