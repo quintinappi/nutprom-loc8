@@ -7,6 +7,7 @@ import TimesheetFilters from './TimesheetFilters';
 import TimesheetTable from './TimesheetTable';
 import { toast } from 'sonner';
 import { useFirebaseAuth } from '../../firebase/auth';
+import PDFExportButton from '../pdf/PDFExportButton';
 
 const TimesheetManager = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -546,13 +547,46 @@ const TimesheetManager = () => {
 
   return (
     <div className="space-y-4">
-      <TimesheetFilters 
-        users={users}
-        selectedUser={selectedUser}
-        selectedDateRange={selectedDateRange}
-        onFilter={handleFilter}
-        isAdmin={user?.is_admin}
-      />
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-4">
+          <TimesheetFilters 
+            users={users}
+            selectedUser={selectedUser}
+            selectedDateRange={selectedDateRange}
+            onFilter={handleFilter}
+            isAdmin={user?.is_admin}
+          />
+        </div>
+        <PDFExportButton
+          employeeDetails={{
+            name: selectedUser?.name || '',
+            surname: selectedUser?.surname || '',
+            employeeId: selectedUser?.id || ''
+          }}
+          period={{
+            startDate: selectedDateRange.start,
+            endDate: selectedDateRange.end
+          }}
+          entries={timesheetEntries}
+          totals={{
+            total_hours: timesheetEntries.reduce((sum, entry) => {
+              const hours = parseFloat(entry.modified_hours) || 0;
+              return sum + hours;
+            }, 0),
+            regular_hours: timesheetEntries.reduce((sum, entry) => {
+              const hours = parseFloat(entry.modified_hours) || 0;
+              const regularHours = Math.min(hours, 9);
+              return sum + regularHours;
+            }, 0),
+            overtime_hours: timesheetEntries.reduce((sum, entry) => {
+              const hours = parseFloat(entry.modified_hours) || 0;
+              const overtime = Math.max(0, hours - 9);
+              return sum + overtime;
+            }, 0)
+          }}
+          companyLogo={selectedUser?.company?.logoUrl}
+        />
+      </div>
       <TimesheetTable
         entries={timesheetEntries}
         onModifiedHoursChange={handleModifiedHoursChange}
