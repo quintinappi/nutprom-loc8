@@ -23,8 +23,14 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner"; // Import toast
+import { jsPDF } from "jspdf";
+import 'jspdf-autotable';
+import { useFirebaseAuth } from '../../firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebase/config';
 
 const TimesheetTable = ({ entries = [], onModifiedHoursChange, onCommentChange, onApprove, selectedUser }) => {
+  const { user } = useFirebaseAuth();
   const [editEntry, setEditEntry] = useState(null);
   const [editType, setEditType] = useState(null);
   const [timeIn, setTimeIn] = useState('');
@@ -32,6 +38,7 @@ const TimesheetTable = ({ entries = [], onModifiedHoursChange, onCommentChange, 
   const [totalHours, setTotalHours] = useState('');
   const [editComment, setEditComment] = useState('');
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
 
   const formatDate = (dateString) => {
     try {
@@ -230,6 +237,95 @@ const TimesheetTable = ({ entries = [], onModifiedHoursChange, onCommentChange, 
     } catch (error) {
       console.error('Error saving edit:', error);
       toast.error('Failed to save changes: ' + error.message);
+    }
+  };
+
+  const generatePDF = async () => {
+    try {
+      setGeneratingPDF(true);
+
+      // Get user data to access the logo
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userData = userDoc.data();
+      const logoBase64 = userData?.pdfSettings?.logoBase64;
+      
+      console.log('Logo exists:', !!logoBase64); // Debug log
+
+      // Create PDF document
+      const doc = new jsPDF();
+      
+      // Add logo if it exists
+      if (logoBase64) {
+        try {
+          // Add the image directly as JPEG
+          doc.addImage(
+            logoBase64,
+            'JPEG',
+            15,  // x position
+            15,  // y position
+            30,  // width
+            15   // height
+          );
+        } catch (error) {
+          console.error('Error adding logo to PDF:', error);
+        }
+      }
+
+      // Add title with proper spacing
+      doc.setFontSize(18);
+      doc.text('Time Sheet', 80, 25);
+
+      // Add period information
+      if (entries.length > 0) {
+        const firstDate = new Date(entries[0].date);
+        const lastDate = new Date(entries[entries.length - 1].date);
+        const periodText = `Period: ${format(firstDate, 'dd/MM/yyyy')} - ${format(lastDate, 'dd/MM/yyyy')}`;
+        doc.setFontSize(12);
+        doc.text(periodText, 15, 35);
+      }
+
+      // Add employee name
+      if (selectedUser?.displayName) {
+        doc.setFontSize(12);
+        doc.text(`Employee: ${selectedUser.displayName}`, 15, 42);
+      }
+
+      // Add table
+      doc.autoTable({
+        columns: [
+          { header: 'Date', dataKey: 'date' },
+          { header: 'Clock In', dataKey: 'clockIn' },
+          { header: 'Clock Out', dataKey: 'clockOut' },
+          { header: 'Duration (h)', dataKey: 'duration' },
+          { header: 'Modified Hours', dataKey: 'modifiedHours' },
+          { header: 'Overtime Hours', dataKey: 'overtimeHours' },
+          { header: 'Comment', dataKey: 'comment' },
+          { header: 'Status', dataKey: 'status' },
+        ],
+        body: entries.map((entry) => {
+          const modifiedHours = parseFloat(entry.modified_hours) || 0;
+          const overtimeHours = Math.max(0, modifiedHours - 9);
+          const regularHours = Math.min(modifiedHours, 9);
+          return {
+            date: formatDate(entry.date),
+            clockIn: formatDisplayTime(entry.time_in),
+            clockOut: formatDisplayTime(entry.time_out),
+            duration: entry.original_hours || '-',
+            modifiedHours: modifiedHours.toFixed(2),
+            overtimeHours: overtimeHours > 0 ? overtimeHours.toFixed(2) : '-',
+            comment: entry.comment || '',
+            status: entry.status || 'pending',
+          };
+        }),
+      });
+
+      // Save the PDF
+      doc.save('timesheet.pdf');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF: ' + error.message);
+    } finally {
+      setGeneratingPDF(false);
     }
   };
 
@@ -447,6 +543,14 @@ const TimesheetTable = ({ entries = [], onModifiedHoursChange, onCommentChange, 
           </tr>
         </tbody>
       </table>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={generatePDF}
+        className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        Generate PDF
+      </Button>
     </div>
   );
 };

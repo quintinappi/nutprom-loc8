@@ -18,6 +18,7 @@ const TimesheetManager = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [timesheetEntries, setTimesheetEntries] = useState([]);
+  const [companyLogo, setCompanyLogo] = useState(null);
   const { user } = useFirebaseAuth();
 
   // Function to generate a unique local ID
@@ -545,6 +546,21 @@ const TimesheetManager = () => {
     loadInitialData();
   }, [user]);
 
+  useEffect(() => {
+    const fetchLogo = async () => {
+      if (user) {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (userData?.pdfSettings?.logoBase64) {
+            setCompanyLogo(userData.pdfSettings.logoBase64);
+          }
+        }
+      }
+    };
+    fetchLogo();
+  }, [user]);
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
@@ -559,15 +575,15 @@ const TimesheetManager = () => {
         </div>
         <PDFExportButton
           employeeDetails={{
-            name: selectedUser?.name || '',
-            surname: selectedUser?.surname || '',
-            employeeId: selectedUser?.id || ''
+            name: selectedUser?.displayName || user?.displayName || '',
+            surname: selectedUser?.surname || user?.surname || '',
           }}
           period={{
-            startDate: selectedDateRange.start,
-            endDate: selectedDateRange.end
+            startDate: selectedDateRange?.startDate || timesheetEntries[0]?.date,
+            endDate: selectedDateRange?.endDate || timesheetEntries[timesheetEntries.length - 1]?.date
           }}
           entries={timesheetEntries}
+          companyLogo={companyLogo}
           totals={{
             total_hours: timesheetEntries.reduce((sum, entry) => {
               const hours = parseFloat(entry.modified_hours) || 0;
@@ -584,7 +600,6 @@ const TimesheetManager = () => {
               return sum + overtime;
             }, 0)
           }}
-          companyLogo={selectedUser?.company?.logoUrl}
         />
       </div>
       <TimesheetTable

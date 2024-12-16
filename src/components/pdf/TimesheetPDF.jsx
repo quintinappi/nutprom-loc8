@@ -6,45 +6,31 @@ const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
     backgroundColor: '#ffffff',
-    padding: 25,
+    padding: 30,
+    fontSize: 12,
   },
   headerSection: {
     flexDirection: 'row',
-    marginBottom: 15,
-    backgroundColor: '#f8f9fa',
+    alignItems: 'center',
+    marginBottom: 20,
+    backgroundColor: 'white',
     padding: 15,
-    borderRadius: 3,
+    borderRadius: 4,
   },
-  logoSection: {
-    width: '20%',
-    marginRight: 15,
-    backgroundColor: '#f1f3f5',
-    padding: 8,
-    borderRadius: 3,
+  logoContainer: {
+    width: 200,
     height: 60,
+    marginRight: 15,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    borderStyle: 'dashed',
   },
-  logoPlaceholder: {
-    fontSize: 8,
-    color: '#6c757d',
-    textAlign: 'center',
-  },
-  logo: {
-    maxWidth: '100%',
-    maxHeight: '100%',
-    objectFit: 'contain',
-  },
-  titleSection: {
+  titleContainer: {
     justifyContent: 'center',
   },
   title: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#2c3e50',
+    color: '#334155',
   },
   infoSection: {
     marginBottom: 15,
@@ -216,111 +202,119 @@ const formatDuration = (duration) => {
   return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
 };
 
-const TimesheetPDF = ({ employeeDetails, period, entries, totals, companyLogo }) => (
-  <Document>
-    <Page size="A4" orientation="landscape" style={styles.page}>
-      <View style={styles.headerSection}>
-        <View style={styles.logoSection}>
-          {companyLogo ? (
-            <Image style={styles.logo} src={companyLogo} />
-          ) : (
-            <Text style={styles.logoPlaceholder}>Company Logo</Text>
+const TimesheetPDF = ({ employeeDetails, period, entries, totals, companyLogo }) => {
+  return (
+    <Document>
+      <Page size="A4" style={styles.page}>
+        <View style={styles.headerSection}>
+          {companyLogo && (
+            <View style={styles.logoContainer}>
+              <Image
+                src={companyLogo}
+                style={{
+                  maxWidth: 300,
+                  maxHeight: 100,
+                  objectFit: 'contain',
+                  backgroundColor: 'transparent'
+                }}
+              />
+            </View>
           )}
-        </View>
-        <View style={styles.titleSection}>
-          <Text style={styles.title}>Time Sheet</Text>
-        </View>
-      </View>
-
-      <View style={styles.infoSection}>
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Employee:</Text>
-          <Text style={styles.value}>{`${employeeDetails?.name || ''} ${employeeDetails?.surname || ''}`}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.label}>Period:</Text>
-          <Text style={styles.value}>
-            {safeFormatDate(period?.startDate)} - {safeFormatDate(period?.endDate)}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.table}>
-        <View style={styles.tableHeader}>
-          <Text style={[styles.headerCell, styles.dateCell]}>Date</Text>
-          <Text style={[styles.headerCell, styles.timeCell]}>Clock In</Text>
-          <Text style={[styles.headerCell, styles.timeCell]}>Clock Out</Text>
-          <Text style={[styles.headerCell, styles.modifiedCell]}>Approved Hours</Text>
-          <Text style={[styles.headerCell, styles.overtimeCell]}>Overtime</Text>
-          <Text style={[styles.headerCell, styles.commentCell]}>Comment</Text>
-          <Text style={[styles.headerCell, styles.statusCell]}>Status</Text>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>Time Sheet</Text>
+          </View>
         </View>
 
-        {entries.map((entry, index) => (
-          <View key={index} style={[
-            styles.tableRow,
-            index % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd
-          ]}>
-            <Text style={[styles.cell, styles.dateCell]}>
-              {safeFormatDate(entry.date)}
-            </Text>
-            <Text style={[styles.cell, styles.timeCell]}>
-              {safeFormatTime(entry.time_in)}
-            </Text>
-            <Text style={[styles.cell, styles.timeCell]}>
-              {safeFormatTime(entry.time_out)}
-            </Text>
-            <Text style={[styles.cell, styles.modifiedCell]}>
-              {formatNumber(entry.modified_hours)}
-            </Text>
-            <Text style={[styles.cell, styles.overtimeCell]}>
-              {(() => {
-                const modifiedHours = parseFloat(entry.modified_hours) || 0;
-                const overtimeHours = Math.max(0, modifiedHours - 9);
-                return overtimeHours > 0 ? formatNumber(overtimeHours) : '-';
-              })()}
-            </Text>
-            <Text style={[styles.cell, styles.commentCell]}>
-              {entry.comment || '-'}
-            </Text>
-            <Text style={[styles.cell, styles.statusCell]}>
-              {entry.status || '-'}
+        <View style={styles.infoSection}>
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Employee:</Text>
+            <Text style={styles.value}>{`${employeeDetails?.name || ''} ${employeeDetails?.surname || ''}`}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Period:</Text>
+            <Text style={styles.value}>
+              {safeFormatDate(period?.startDate)} - {safeFormatDate(period?.endDate)}
             </Text>
           </View>
-        ))}
+        </View>
 
-        <View style={styles.totalsRow}>
-          <Text style={[styles.totalsLabel, { flex: 1 }]}>Total Approved Hours:</Text>
-          <Text style={[styles.totalsValue, { flex: 1 }]}></Text>
-          <Text style={[styles.totalsValue, { flex: 1 }]}></Text>
-          <Text style={[styles.totalsValue, { flex: 1 }]}></Text>
-          <Text style={[styles.totalsValue, { flex: 1 }]}>Regular: {formatNumber(totals.regular_hours)}h</Text>
-          <Text style={[styles.totalsValue, { flex: 1 }]}>Overtime: {formatNumber(totals.overtime_hours)}h</Text>
-          <Text style={[styles.totalsValue, { flex: 2 }]}></Text>
-          <Text style={[styles.totalsValue, { flex: 1 }]}></Text>
-        </View>
-      </View>
+        <View style={styles.table}>
+          <View style={styles.tableHeader}>
+            <Text style={[styles.headerCell, styles.dateCell]}>Date</Text>
+            <Text style={[styles.headerCell, styles.timeCell]}>Clock In</Text>
+            <Text style={[styles.headerCell, styles.timeCell]}>Clock Out</Text>
+            <Text style={[styles.headerCell, styles.modifiedCell]}>Approved Hours</Text>
+            <Text style={[styles.headerCell, styles.overtimeCell]}>Overtime</Text>
+            <Text style={[styles.headerCell, styles.commentCell]}>Comment</Text>
+            <Text style={[styles.headerCell, styles.statusCell]}>Status</Text>
+          </View>
 
-      <View style={styles.footer}>
-        <View style={styles.signatureSection}>
-          <View style={styles.signatureLine} />
-          <Text style={styles.signatureLabel}>Employee Signature</Text>
-        </View>
-        <View style={styles.signatureSection}>
-          <View style={styles.signatureLine} />
-          <Text style={styles.signatureLabel}>Supervisor Signature</Text>
-        </View>
-        <View style={styles.signatureSection}>
-          <View style={styles.signatureLine} />
-          <Text style={styles.signatureLabel}>Date</Text>
-        </View>
-      </View>
+          {entries.map((entry, index) => (
+            <View key={index} style={[
+              styles.tableRow,
+              index % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd
+            ]}>
+              <Text style={[styles.cell, styles.dateCell]}>
+                {safeFormatDate(entry.date)}
+              </Text>
+              <Text style={[styles.cell, styles.timeCell]}>
+                {safeFormatTime(entry.time_in)}
+              </Text>
+              <Text style={[styles.cell, styles.timeCell]}>
+                {safeFormatTime(entry.time_out)}
+              </Text>
+              <Text style={[styles.cell, styles.modifiedCell]}>
+                {formatNumber(entry.modified_hours)}
+              </Text>
+              <Text style={[styles.cell, styles.overtimeCell]}>
+                {(() => {
+                  const modifiedHours = parseFloat(entry.modified_hours) || 0;
+                  const overtimeHours = Math.max(0, modifiedHours - 9);
+                  return overtimeHours > 0 ? formatNumber(overtimeHours) : '-';
+                })()}
+              </Text>
+              <Text style={[styles.cell, styles.commentCell]}>
+                {entry.comment || '-'}
+              </Text>
+              <Text style={[styles.cell, styles.statusCell]}>
+                {entry.status || '-'}
+              </Text>
+            </View>
+          ))}
 
-      <Text style={styles.pageNumber} render={({ pageNumber, totalPages }) => 
-        `Page ${pageNumber} of ${totalPages}`
-      } fixed />
-    </Page>
-  </Document>
-);
+          <View style={styles.totalsRow}>
+            <Text style={[styles.totalsLabel, { flex: 1 }]}>Total Approved Hours:</Text>
+            <Text style={[styles.totalsValue, { flex: 1 }]}></Text>
+            <Text style={[styles.totalsValue, { flex: 1 }]}></Text>
+            <Text style={[styles.totalsValue, { flex: 1 }]}></Text>
+            <Text style={[styles.totalsValue, { flex: 1 }]}>Regular: {formatNumber(totals.regular_hours)}h</Text>
+            <Text style={[styles.totalsValue, { flex: 1 }]}>Overtime: {formatNumber(totals.overtime_hours)}h</Text>
+            <Text style={[styles.totalsValue, { flex: 2 }]}></Text>
+            <Text style={[styles.totalsValue, { flex: 1 }]}></Text>
+          </View>
+        </View>
+
+        <View style={styles.footer}>
+          <View style={styles.signatureSection}>
+            <View style={styles.signatureLine} />
+            <Text style={styles.signatureLabel}>Employee Signature</Text>
+          </View>
+          <View style={styles.signatureSection}>
+            <View style={styles.signatureLine} />
+            <Text style={styles.signatureLabel}>Supervisor Signature</Text>
+          </View>
+          <View style={styles.signatureSection}>
+            <View style={styles.signatureLine} />
+            <Text style={styles.signatureLabel}>Date</Text>
+          </View>
+        </View>
+
+        <Text style={styles.pageNumber} render={({ pageNumber, totalPages }) => 
+          `Page ${pageNumber} of ${totalPages}`
+        } fixed />
+      </Page>
+    </Document>
+  );
+};
 
 export default TimesheetPDF;

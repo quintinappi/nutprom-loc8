@@ -2,12 +2,6 @@ import React, { useState } from 'react';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import { Button } from "@/components/ui/button";
 import TimesheetPDF from './TimesheetPDF';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 const PDFExportButton = ({ 
   employeeDetails, 
@@ -21,41 +15,42 @@ const PDFExportButton = ({
   return (
     <div className="flex gap-2">
       {/* Preview Button and Dialog */}
-      <Button 
+      <Button
         variant="outline"
+        size="sm"
         onClick={() => setShowPreview(true)}
       >
         Preview PDF
       </Button>
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-[95vw] w-full h-[95vh] p-4">
-          <DialogHeader className="pb-2">
-            <DialogTitle>PDF Preview</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 w-full h-[calc(95vh-4rem)]">
-            <PDFViewer 
-              width="100%" 
-              height="100%" 
-              style={{ 
-                border: 'none',
-                width: '100%',
-                height: '100%',
-                display: 'block'
-              }}
-            >
-              <TimesheetPDF
-                employeeDetails={employeeDetails}
-                period={period}
-                entries={entries}
-                totals={totals}
-                companyLogo={companyLogo}
-              />
-            </PDFViewer>
+      {showPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white w-[90%] h-[90%] p-4 rounded-lg flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">PDF Preview</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowPreview(false)}
+              >
+                Close
+              </Button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <PDFViewer width="100%" height="100%" className="border rounded">
+                <TimesheetPDF
+                  employeeDetails={employeeDetails}
+                  period={period}
+                  entries={entries}
+                  totals={totals}
+                  companyLogo={companyLogo}
+                />
+              </PDFViewer>
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      {/* Export Button */}
+      {/* Download Button */}
       <PDFDownloadLink
         document={
           <TimesheetPDF
@@ -66,14 +61,15 @@ const PDFExportButton = ({
             companyLogo={companyLogo}
           />
         }
-        fileName={`timesheet-${employeeDetails.name}-${period.startDate}.pdf`}
+        fileName={`timesheet-${period?.startDate}-${period?.endDate}.pdf`}
       >
-        {({ blob, url, loading, error }) => (
-          <Button 
-            disabled={loading} 
+        {({ loading }) => (
+          <Button
             variant="outline"
+            size="sm"
+            disabled={loading}
           >
-            {loading ? 'Generating PDF...' : 'Export PDF'}
+            {loading ? 'Loading...' : 'Download PDF'}
           </Button>
         )}
       </PDFDownloadLink>
