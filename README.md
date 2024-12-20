@@ -180,6 +180,24 @@ NutPro Time Tracking is a comprehensive employee time management system built wi
 - User authentication
 - Role-based access control
 
+### Version 7.0 (December 11, 2024)
+- Added signature functionality for timesheets
+  - Implemented signature pad for employee signatures
+  - Added tablet-friendly interface for signing timesheets
+  - Integrated signature display in PDF exports
+- Enhanced PDF functionality
+  - Added company logo support
+  - Improved PDF preview with zoom and print capabilities
+  - Fixed employee name display to show full name
+- Added supervisor approval workflow
+  - New approval interface for supervisors
+  - Status tracking for timesheet approvals
+  - Email notifications for approval status changes
+- UI/UX Improvements
+  - Redesigned tablet interface
+  - Enhanced dialog sizes and responsiveness
+  - Improved navigation and user feedback
+
 ## Setup
 1. Clone the repository
 2. Install dependencies with `npm install`
