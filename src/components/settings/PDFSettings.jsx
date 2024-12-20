@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from 'sonner';
 import { useFirebaseAuth } from '../../firebase/auth';
+import SupervisorSignaturePad from './SupervisorSignaturePad';
 
 const PDFSettings = () => {
   const [isUploading, setIsUploading] = useState(false);
@@ -108,53 +109,59 @@ const PDFSettings = () => {
   };
 
   return (
-    <Card className="mt-6">
-      <CardHeader>
-        <CardTitle>PDF Export Settings</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-medium mb-2">Timesheet Logo</h3>
-            <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 flex items-center justify-center min-h-[120px] bg-gray-50">
-              {logoUrl ? (
-                <img 
-                  src={logoUrl} 
-                  alt="Timesheet Logo" 
-                  className="max-h-24 w-auto object-contain"
+    <div className="space-y-6">
+      {/* Logo Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>PDF Logo Settings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium mb-2">Timesheet Logo</h3>
+              <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 flex items-center justify-center min-h-[120px] bg-gray-50">
+                {logoUrl ? (
+                  <img 
+                    src={logoUrl} 
+                    alt="Timesheet Logo" 
+                    className="max-h-24 w-auto object-contain"
+                  />
+                ) : (
+                  <div className="text-center text-gray-500">
+                    <p>No logo uploaded</p>
+                    <p className="text-sm">Click below to upload</p>
+                  </div>
+                )}
+              </div>
+              <div className="mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => document.getElementById('logo-upload').click()}
+                  disabled={isUploading}
+                  className="w-full"
+                >
+                  {isUploading ? 'Uploading...' : logoUrl ? 'Change Logo' : 'Upload Logo'}
+                </Button>
+                <input
+                  id="logo-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  style={{ display: 'none' }}
                 />
-              ) : (
-                <div className="text-center text-gray-500">
-                  <p>No logo uploaded</p>
-                  <p className="text-sm">Click below to upload</p>
-                </div>
-              )}
-            </div>
-            <div className="mt-4">
-              <Button
-                variant="outline"
-                onClick={() => document.getElementById('logo-upload').click()}
-                disabled={isUploading}
-                className="w-full"
-              >
-                {isUploading ? 'Uploading...' : logoUrl ? 'Change Logo' : 'Upload Logo'}
-              </Button>
-              <input
-                id="logo-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleFileUpload}
-                style={{ display: 'none' }}
-              />
-              <p className="text-sm text-gray-500 mt-2">
-                This logo will appear on your exported PDF timesheets. 
-                Recommended size: 600x200px. Max file size: 5MB
-              </p>
+                <p className="text-sm text-gray-500 mt-2">
+                  This logo will appear on your exported PDF timesheets. 
+                  Recommended size: 600x200px. Max file size: 5MB
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {/* Supervisor Signature */}
+      <SupervisorSignaturePad />
+    </div>
   );
 };
 

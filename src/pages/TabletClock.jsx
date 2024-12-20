@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { collection, query, where, getDocs, addDoc, orderBy, limit } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
+import { collection, query, where, getDocs, addDoc, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -9,12 +9,27 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import Logo from '@/components/Logo';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
+import TimesheetSignDialog from '../components/timesheet/TimesheetSignDialog';
+import { format } from 'date-fns';
+import PDFExportButton from '../components/pdf/PDFExportButton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+const formatDate = (timestamp) => {
+  if (!timestamp) return '-';
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  return format(date, 'dd/MM/yyyy');
+};
 
 const TabletClock = () => {
   const [code, setCode] = useState('');
   const [action, setAction] = useState('');
   const [status, setStatus] = useState(null);
   const [userInfo, setUserInfo] = useState(null);
+  const [pendingTimesheets, setPendingTimesheets] = useState([]);
+  const [showSignDialog, setShowSignDialog] = useState(false);
+  const [selectedTimesheet, setSelectedTimesheet] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [companyLogo, setCompanyLogo] = useState(null);
   const navigate = useNavigate();
 
   const handleCodeChange = (e) => {
@@ -46,11 +61,26 @@ const TabletClock = () => {
       const userId = user.id;
       const userData = user.data();
       setUserInfo({
+        id: userId,
         name: userData.name || '',
         surname: userData.surname || '',
         email: userData.email || '',
         avatar_url: userData.avatar_url || null
       });
+
+      // Fetch pending timesheets
+      const timesheetsRef = collection(db, 'timesheets');
+      const timesheetsQuery = query(
+        timesheetsRef,
+        where('employeeId', '==', userId),
+        where('status', '==', 'PENDING_EMPLOYEE')
+      );
+      const timesheetsSnapshot = await getDocs(timesheetsQuery);
+      const timesheets = timesheetsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setPendingTimesheets(timesheets);
 
       // Get today's start and end
       const today = new Date();
@@ -145,6 +175,7 @@ const TabletClock = () => {
       setTimeout(() => {
         setUserInfo(null);
         setStatus(null);
+        setPendingTimesheets([]);
       }, 3000);
     } catch (error) {
       console.error('Error clocking in/out:', error);
@@ -199,6 +230,7 @@ const TabletClock = () => {
         setCode('');
         setStatus(null);
         setUserInfo(null);
+        setPendingTimesheets([]);
       }, 3000);
     } catch (error) {
       console.error('Error booking leave:', error);
@@ -210,15 +242,67 @@ const TabletClock = () => {
     setCode('');
     setStatus(null);
     setUserInfo(null);
+    setPendingTimesheets([]);
     toast.success('Session ended');
   };
+
+  const handleSignClick = (timesheet) => {
+    setSelectedTimesheet(timesheet);
+    setShowPreview(true);
+  };
+
+  const handlePreviewClose = () => {
+    setShowPreview(false);
+    setShowSignDialog(true);
+  };
+
+  const handleSignDialogClose = () => {
+    setShowSignDialog(false);
+    setSelectedTimesheet(null);
+  };
+
+  useEffect(() => {
+    const fetchLogo = async () => {
+      try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('role', '==', 'admin'), limit(1));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const adminDoc = querySnapshot.docs[0];
+          const adminData = adminDoc.data();
+          if (adminData?.pdfSettings?.logoBase64) {
+            console.log('Logo found from admin settings');
+            setCompanyLogo(adminData.pdfSettings.logoBase64);
+          } else {
+            console.log('No logo found in admin settings');
+          }
+        } else {
+          console.log('No admin user found');
+        }
+      } catch (error) {
+        console.error('Error fetching company logo:', error);
+      }
+    };
+    fetchLogo();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center">
       <Card className="w-full max-w-2xl">
         <CardHeader className="flex flex-col items-center space-y-2">
-          <Logo size="large" />
-          <CardTitle className="text-2xl font-bold mt-4">NutProM Tablet Clocking Station</CardTitle>
+          {companyLogo ? (
+            <img 
+              src={companyLogo} 
+              alt="Company Logo" 
+              className="h-24 object-contain"
+            />
+          ) : (
+            <Logo size="large" />
+          )}
+          <CardTitle className="text-2xl font-bold mt-4">
+            NutProM Tablet Clocking Station
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
@@ -248,6 +332,31 @@ const TabletClock = () => {
                     Current Status: {status === 'leave' ? 'Leave Day Booked' : `Clocked ${status.charAt(0).toUpperCase() + status.slice(1)}`}
                   </p>
                 </div>
+              </div>
+            )}
+
+            {pendingTimesheets.length > 0 && (
+              <div className="container mx-auto py-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Pending Timesheets for Signature</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {pendingTimesheets.map((timesheet) => (
+                        <div key={timesheet.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div>
+                            <p className="font-medium">Period: {formatDate(timesheet.period?.start)} - {formatDate(timesheet.period?.end)}</p>
+                            <p className="text-muted-foreground">Total Hours: {timesheet.totals?.total_hours?.toFixed(2)}</p>
+                          </div>
+                          <Button onClick={() => handleSignClick(timesheet)}>
+                            View and Sign
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             )}
 
@@ -284,6 +393,65 @@ const TabletClock = () => {
           </Button>
         </CardFooter>
       </Card>
+
+      {/* Timesheet Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-[95vw] w-full h-[95vh] p-6">
+          <DialogHeader>
+            <DialogTitle>Review Timesheet</DialogTitle>
+          </DialogHeader>
+          {selectedTimesheet && (
+            <div className="flex flex-col h-[calc(95vh-8rem)]">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowPreview(false)}
+                className="mb-4"
+              >
+                Back to List
+              </Button>
+              <div className="flex-1 min-h-0">
+                <PDFExportButton
+                  employeeDetails={{
+                    name: userInfo?.name || '',
+                    surname: userInfo?.surname || '',
+                    fullName: `${userInfo?.name || ''} ${userInfo?.surname || ''}`.trim()
+                  }}
+                  period={{
+                    start: formatDate(selectedTimesheet.period?.start),
+                    end: formatDate(selectedTimesheet.period?.end)
+                  }}
+                  entries={selectedTimesheet.entries || []}
+                  totals={selectedTimesheet.totals || {}}
+                  companyLogo={companyLogo}
+                  employeeSignature={selectedTimesheet.employeeSignature}
+                  showPreview={true}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-4 mt-auto">
+                <Button variant="outline" onClick={() => setShowPreview(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handlePreviewClose}>
+                  Proceed to Sign
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Signature Dialog */}
+      <TimesheetSignDialog
+        open={showSignDialog}
+        onClose={handleSignDialogClose}
+        timesheet={selectedTimesheet}
+        onSignComplete={() => {
+          setShowSignDialog(false);
+          setSelectedTimesheet(null);
+          // Refresh the list of pending timesheets
+          checkStatus();
+        }}
+      />
     </div>
   );
 };

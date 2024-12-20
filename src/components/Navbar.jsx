@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Clock, Users, Menu, X, Settings as SettingsIcon, BarChart, FileDown, ClipboardList } from 'lucide-react';
+import { Clock, Users, Menu, X, Settings as SettingsIcon, BarChart, FileDown, ClipboardList, FileText } from 'lucide-react';
 import { useMediaQuery } from '@react-hook/media-query';
 import Logo from './Logo';
 import { Link } from 'react-router-dom';
@@ -14,10 +14,11 @@ const Navbar = ({ onLogout, activeTab, setActiveTab, userRole }) => {
       <Button
         onClick={onClick}
         variant={isActive ? 'default' : 'ghost'}
-        className="flex items-center w-full justify-start"
+        className="flex items-center justify-start gap-2 px-3 h-9"
+        size="sm"
       >
         {icon}
-        <span className="ml-2">{children}</span>
+        <span>{children}</span>
       </Button>
     </Link>
   );
@@ -27,6 +28,7 @@ const Navbar = ({ onLogout, activeTab, setActiveTab, userRole }) => {
     { id: 'total-hours', label: 'Total Hours', icon: <BarChart className="h-4 w-4" />, show: true, to: '/total-hours' },
     { id: 'users', label: 'Manage Users', icon: <Users className="h-4 w-4" />, show: userRole === 'admin', to: '/users' },
     { id: 'timesheet', label: 'Timesheets', icon: <ClipboardList className="h-4 w-4" />, show: userRole === 'admin', to: '/timesheet' },
+    { id: 'stored-timesheets', label: 'Stored Timesheets', icon: <FileText className="h-4 w-4" />, show: userRole === 'admin', to: '/stored-timesheets' },
     { id: 'settings', label: 'Settings', icon: <SettingsIcon className="h-4 w-4" />, show: true, to: '/settings' },
     { id: 'export-csv', label: 'Export CSV', icon: <FileDown className="h-4 w-4" />, show: userRole === 'admin', to: '/export-csv' },
   ];
@@ -39,9 +41,9 @@ const Navbar = ({ onLogout, activeTab, setActiveTab, userRole }) => {
 
   return (
     <nav className="bg-white shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center">
+          <div className="flex items-center shrink-0 w-[180px]">
             <Logo size="small" />
             <span className="font-bold text-xl ml-2">NutProM</span>
           </div>
@@ -52,7 +54,7 @@ const Navbar = ({ onLogout, activeTab, setActiveTab, userRole }) => {
               </Button>
             </div>
           ) : (
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-1 overflow-x-auto flex-grow justify-end">
               {navItems.filter(item => item.show).map(item => (
                 <NavItem
                   key={item.id}
@@ -64,15 +66,20 @@ const Navbar = ({ onLogout, activeTab, setActiveTab, userRole }) => {
                   {item.label}
                 </NavItem>
               ))}
-              <Button onClick={async () => {
-                try {
-                  console.log('Attempting to logout...');
-                  await onLogout();
-                  console.log('Logout successful');
-                } catch (error) {
-                  console.error('Logout failed:', error);
-                }
-              }} variant="outline">
+              <Button 
+                onClick={async () => {
+                  try {
+                    console.log('Attempting to logout...');
+                    await onLogout();
+                    console.log('Logout successful');
+                  } catch (error) {
+                    console.error('Logout failed:', error);
+                  }
+                }} 
+                variant="outline"
+                size="sm"
+                className="ml-2"
+              >
                 Logout
               </Button>
             </div>

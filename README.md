@@ -149,3 +149,49 @@ NutPro Time Tracking is a comprehensive employee time management system built wi
 - Initial stable release
 - Basic clock in/out functionality
 - Location tracking implementation
+
+### feature/timesheet-pdf-signatures
+- Added signature functionality for timesheets
+- Implemented PDF preview with signature display
+- Added tablet view for timesheet signing
+- Added supervisor approval workflow
+- Fixed employee name display in PDFs
+- Improved PDF preview functionality
+- Added company logo support in PDFs
+
+### feature/timesheet-pdf-totals
+- Added total hours calculation
+- Implemented PDF export with totals
+- Added timesheet finalization workflow
+
+### feature/timesheet-hours-modification
+- Added ability to modify timesheet hours
+- Implemented timesheet entry editing
+- Added validation for time entries
+
+### feature/pdf-export
+- Initial PDF export implementation
+- Basic timesheet layout
+- Company logo integration
+
+### 3rd
+- Initial timesheet management implementation
+- Basic CRUD operations
+- User authentication
+- Role-based access control
+
+## Setup
+1. Clone the repository
+2. Install dependencies with `npm install`
+3. Configure Firebase credentials
+4. Run development server with `npm run dev`
+
+## Features
+- Employee timesheet management
+- PDF export with signatures
+- Tablet-friendly interface for signing
+- Supervisor approval workflow
+- Role-based access control
+- Company logo integration
+- Total hours calculation
+- Timesheet finalization

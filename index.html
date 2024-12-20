@@ -2,39 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NutProM</title>
-    <meta name="description" content="NutProM - Employee Management System" />
-    <meta name="author" content="GPT Engineer" />
-    <meta property="og:image" content="/og-image.svg" />
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#000000" />
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', async () => {
-          try {
-            // Unregister any existing service workers first
-            const registrations = await navigator.serviceWorker.getRegistrations();
-            for(let registration of registrations) {
-              await registration.unregister();
-            }
-            
-            // Register the new service worker
-            const registration = await navigator.serviceWorker.register('/service-worker.js');
-            console.log('Service Worker registered: ', registration);
-          } catch (error) {
-            console.error('Service Worker registration failed: ', error);
-          }
-        });
-      }
-    </script>
   </body>
 </html>

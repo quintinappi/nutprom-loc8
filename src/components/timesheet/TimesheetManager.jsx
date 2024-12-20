@@ -8,19 +8,19 @@ import TimesheetTable from './TimesheetTable';
 import { toast } from 'sonner';
 import { useFirebaseAuth } from '../../firebase/auth';
 import PDFExportButton from '../pdf/PDFExportButton';
+import { timesheetStorage } from '../../services/TimesheetStorage';
+import { Button } from "@/components/ui/button";
 
 const TimesheetManager = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedDateRange, setSelectedDateRange] = useState({
-    start: startOfWeek(new Date()),
-    end: endOfWeek(new Date())
-  });
   const [selectedUser, setSelectedUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [timesheetEntries, setTimesheetEntries] = useState([]);
   const [companyLogo, setCompanyLogo] = useState(null);
   const { user } = useFirebaseAuth();
-
+  const [dateRange, setDateRange] = useState({ start: null, end: null });
+  const [entries, setEntries] = useState([]);
+  
   // Function to generate a unique local ID
   const generateLocalId = (date) => `local-${date}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -146,115 +146,116 @@ const TimesheetManager = () => {
     return processedEntries;
   };
 
-  const fetchEntries = async (userId, dateRange) => {
-    if (!userId || !dateRange?.start || !dateRange?.end) {
-      console.log('Missing required data:', { userId, startDate: dateRange?.start, endDate: dateRange?.end });
-      return;
-    }
+const fetchEntries = async (userId, dateRange) => {
+  if (!userId || !dateRange?.start || !dateRange?.end) {
+    console.log('Missing required data:', { userId, startDate: dateRange?.start, endDate: dateRange?.end });
+    return;
+  }
 
-    setIsLoading(true);
-    try {
-      // Fetch all clock entries including empty days
-      const clockingsRef = collection(db, "clock_entries");
-      const startDate = startOfDay(dateRange.start);
-      const endDate = endOfDay(dateRange.end);
+  setIsLoading(true);
+  try {
+    // Fetch all clock entries including empty days
+    const clockingsRef = collection(db, "clock_entries");
+    const startDate = startOfDay(dateRange.start);
+    const endDate = endOfDay(dateRange.end);
 
-      console.log('Fetching with params:', { 
-        userId, 
-        startDate: startDate.toISOString(), 
-        endDate: endDate.toISOString() 
-      });
-      
-      const q = query(
-        clockingsRef,
-        where("user_id", "==", userId),
-        where("timestamp", ">=", startDate.toISOString()),
-        where("timestamp", "<=", endDate.toISOString()),
-        orderBy("timestamp", "asc")
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const clockEntries = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        console.log('Raw clock entry:', { id: doc.id, ...data });
-        return { id: doc.id, ...data };
-      });
-      
-      console.log("Raw clocking entries:", clockEntries);
-      
-      // Fetch leave entries
-      const leaveRef = collection(db, "leave_requests");
-      const leaveQuery = query(
-        leaveRef,
-        where("user_id", "==", userId),
-        where("status", "==", "approved"),
-        orderBy("startDate", "asc")
-      );
-      
-      const leaveSnapshot = await getDocs(leaveQuery);
-      const allLeaveEntries = leaveSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      console.log("All leave entries:", allLeaveEntries);
+    console.log('Fetching with params:', { 
+      userId, 
+      startDate: startDate.toISOString(), 
+      endDate: endDate.toISOString() 
+    });
+    
+    const q = query(
+      clockingsRef,
+      where("user_id", "==", userId),
+      where("timestamp", ">=", startDate.toISOString()),
+      where("timestamp", "<=", endDate.toISOString()),
+      orderBy("timestamp", "asc")
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const clockEntries = querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      console.log('Raw clock entry:', { id: doc.id, ...data });
+      return { id: doc.id, ...data };
+    });
+    
+    console.log("Raw clocking entries:", clockEntries);
+    
+    // Fetch leave entries
+    const leaveRef = collection(db, "leave_requests");
+    const leaveQuery = query(
+      leaveRef,
+      where("user_id", "==", userId),
+      where("status", "==", "approved"),
+      orderBy("startDate", "asc")
+    );
+    
+    const leaveSnapshot = await getDocs(leaveQuery);
+    const allLeaveEntries = leaveSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    console.log("All leave entries:", allLeaveEntries);
 
-      // Filter leave entries for the date range
-      const leaveEntries = allLeaveEntries.filter(entry => {
-        const leaveStart = new Date(entry.startDate);
-        const leaveEnd = new Date(entry.endDate);
-        const rangeStart = new Date(dateRange.start);
-        const rangeEnd = new Date(dateRange.end);
-        
-        const isInRange = leaveStart <= rangeEnd && leaveEnd >= rangeStart;
-        console.log('Leave entry date check:', {
-          entry: entry.id,
-          leaveStart,
-          leaveEnd,
-          rangeStart,
-          rangeEnd,
-          isInRange
-        });
-        return isInRange;
+    // Filter leave entries for the date range
+    const leaveEntries = allLeaveEntries.filter(entry => {
+      const leaveStart = new Date(entry.startDate);
+      const leaveEnd = new Date(entry.endDate);
+      const rangeStart = new Date(dateRange.start);
+      const rangeEnd = new Date(dateRange.end);
+      
+      const isInRange = leaveStart <= rangeEnd && leaveEnd >= rangeStart;
+      console.log('Leave entry date check:', {
+        entry: entry.id,
+        leaveStart,
+        leaveEnd,
+        rangeStart,
+        rangeEnd,
+        isInRange
       });
+      return isInRange;
+    });
+    
+    console.log("Filtered leave entries:", leaveEntries);
+    
+    // Convert leave entries into daily entries
+    const leaveEntriesByDay = [];
+    leaveEntries.forEach(leave => {
+      const start = new Date(leave.startDate);
+      const end = new Date(leave.endDate);
+      const days = eachDayOfInterval({ start, end });
       
-      console.log("Filtered leave entries:", leaveEntries);
-      
-      // Convert leave entries into daily entries
-      const leaveEntriesByDay = [];
-      leaveEntries.forEach(leave => {
-        const start = new Date(leave.startDate);
-        const end = new Date(leave.endDate);
-        const days = eachDayOfInterval({ start, end });
-        
-        days.forEach(day => {
-          if (day >= new Date(dateRange.start) && day <= new Date(dateRange.end)) {
-            leaveEntriesByDay.push({
-              id: `${leave.id}-${format(day, 'yyyy-MM-dd')}`,
-              date: format(day, 'yyyy-MM-dd'),
-              user_id: userId,
-              isLeaveDay: true,
-              status: 'approved',
-              modified_hours: '8.00',
-              comment: 'Leave Day'
-            });
-          }
-        });
+      days.forEach(day => {
+        if (day >= new Date(dateRange.start) && day <= new Date(dateRange.end)) {
+          leaveEntriesByDay.push({
+            id: `${leave.id}-${format(day, 'yyyy-MM-dd')}`,
+            date: format(day, 'yyyy-MM-dd'),
+            user_id: userId,
+            isLeaveDay: true,
+            status: 'approved',
+            modified_hours: '8.00',
+            comment: 'Leave Day'
+          });
+        }
       });
-      
-      console.log("Leave entries by day:", leaveEntriesByDay);
-      
-      // Combine all entries
-      const allEntries = [...clockEntries, ...leaveEntriesByDay];
-      console.log("Combined entries:", allEntries);
-      
-      const processedEntries = processEntries(allEntries, { start: dateRange.start, end: dateRange.end });
-      console.log("Final processed entries:", processedEntries);
-      
-      setTimesheetEntries(processedEntries);
-    } catch (error) {
-      console.error('Error fetching entries:', error);
-      toast.error('Failed to fetch timesheet entries');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    });
+    
+    console.log("Leave entries by day:", leaveEntriesByDay);
+    
+    // Combine all entries
+    const allEntries = [...clockEntries, ...leaveEntriesByDay];
+    console.log("Combined entries:", allEntries);
+    
+    const processedEntries = processEntries(allEntries, { start: dateRange.start, end: dateRange.end });
+    console.log("Final processed entries:", processedEntries);
+    
+    setTimesheetEntries(processedEntries);
+    setEntries(processedEntries); // Set entries state here
+  } catch (error) {
+    console.error('Error fetching entries:', error);
+    toast.error('Failed to fetch timesheet entries');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleModifiedHoursChange = async (entryId, updates) => {
     try {
@@ -378,7 +379,7 @@ const TimesheetManager = () => {
       toast.success('Entry updated successfully');
       
       // Refresh entries
-      await fetchEntries(updates.userId, selectedDateRange);
+      await fetchEntries(updates.userId, dateRange);
     } catch (error) {
       console.error('Error updating entry:', error);
       toast.error('Failed to update entry: ' + error.message);
@@ -499,7 +500,7 @@ const TimesheetManager = () => {
 
       // Refresh data after a delay
       await new Promise(resolve => setTimeout(resolve, 500));
-      await fetchEntries(selectedUser.id, selectedDateRange.start, selectedDateRange.end);
+      await fetchEntries(selectedUser.id, dateRange.start, dateRange.end);
 
     } catch (error) {
       console.error('Error approving entry:', error);
@@ -509,9 +510,16 @@ const TimesheetManager = () => {
   };
 
   const handleFilter = async ({ user, dateRange }) => {
-    setSelectedUser(user);
-    setSelectedDateRange(dateRange);
-    await fetchEntries(user.id, dateRange);
+    if (!user && !selectedUser) {
+      toast.error('Please select a user first');
+      return;
+    }
+
+    // Keep the current user if no new user is selected
+    const userToUse = user || selectedUser;
+    setSelectedUser(userToUse);
+    setDateRange(dateRange);
+    await fetchEntries(userToUse.id, dateRange);
   };
 
   useEffect(() => {
@@ -532,8 +540,14 @@ const TimesheetManager = () => {
           const currentUser = fetchedUsers.find(u => u.id === user.uid);
           if (currentUser) {
             setSelectedUser(currentUser);
-            await fetchEntries(currentUser.id, selectedDateRange);
+            await fetchEntries(currentUser.id, dateRange);
+          } else {
+            console.error('Current user not found in fetched users');
+            toast.error('User not found in the system.');
           }
+        } else {
+          console.error('User is not authenticated');
+          toast.error('User is not authenticated.');
         }
       } catch (error) {
         console.error('Error loading initial data:', error);
@@ -561,54 +575,120 @@ const TimesheetManager = () => {
     fetchLogo();
   }, [user]);
 
+  const finalizeTimesheet = async () => {
+    if (!selectedUser) {
+      toast.error('Please select a user first');
+      return;
+    }
+
+    if (!dateRange.start || !dateRange.end) {
+      toast.error('Please select a date range');
+      return;
+    }
+
+    try {
+      const timesheetData = {
+        employeeId: selectedUser.id,
+        employeeName: selectedUser.displayName,
+        employeeSurname: selectedUser.surname,
+        period: { start: dateRange.start, end: dateRange.end },
+        entries: entries.map(entry => ({
+          date: entry.date,
+          time_in: entry.time_in,
+          time_out: entry.time_out,
+          modified_hours: entry.modified_hours,
+          status: entry.status,
+          comment: entry.comment
+        })),
+        status: 'PENDING_EMPLOYEE',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        totals: calculateTotals(entries)
+      };
+
+      await timesheetStorage.storeTimesheet(timesheetData);
+      toast.success('Timesheet finalized successfully');
+      
+      // Reset selected user and date range
+      setSelectedUser(null);
+      setDateRange({ start: null, end: null });
+      setEntries([]);
+      
+      // Navigate to stored timesheets instead of reloading
+      window.location.href = '/stored-timesheets';
+    } catch (error) {
+      console.error('Error finalizing timesheet:', error);
+      toast.error('Error finalizing timesheet: ' + error.message);
+    }
+  };
+
+  const calculateTotals = (entries) => {
+    return {
+      total_hours: entries.reduce((sum, entry) => {
+        const hours = parseFloat(entry.modified_hours) || 0;
+        return sum + hours;
+      }, 0),
+      regular_hours: entries.reduce((sum, entry) => {
+        const hours = parseFloat(entry.modified_hours) || 0;
+        const regularHours = Math.min(hours, 9);
+        return sum + regularHours;
+      }, 0),
+      overtime_hours: entries.reduce((sum, entry) => {
+        const hours = parseFloat(entry.modified_hours) || 0;
+        const overtime = Math.max(0, hours - 9);
+        return sum + overtime;
+      }, 0)
+    };
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-4">
-          <TimesheetFilters 
-            users={users}
-            selectedUser={selectedUser}
-            selectedDateRange={selectedDateRange}
-            onFilter={handleFilter}
-            isAdmin={user?.is_admin}
-          />
+    <div className="container mx-auto py-6">
+      {!selectedUser ? (
+        <div className="text-center p-8 bg-gray-50 rounded-lg shadow-sm">
+          <h2 className="text-2xl font-semibold mb-4">Welcome to Timesheet Management</h2>
+          <p className="text-gray-600 mb-4">
+            To get started, please select a user and date range from the filters above.
+          </p>
         </div>
-        <PDFExportButton
-          employeeDetails={{
-            name: selectedUser?.displayName || user?.displayName || '',
-            surname: selectedUser?.surname || user?.surname || '',
-          }}
-          period={{
-            startDate: selectedDateRange?.startDate || timesheetEntries[0]?.date,
-            endDate: selectedDateRange?.endDate || timesheetEntries[timesheetEntries.length - 1]?.date
-          }}
-          entries={timesheetEntries}
-          companyLogo={companyLogo}
-          totals={{
-            total_hours: timesheetEntries.reduce((sum, entry) => {
-              const hours = parseFloat(entry.modified_hours) || 0;
-              return sum + hours;
-            }, 0),
-            regular_hours: timesheetEntries.reduce((sum, entry) => {
-              const hours = parseFloat(entry.modified_hours) || 0;
-              const regularHours = Math.min(hours, 9);
-              return sum + regularHours;
-            }, 0),
-            overtime_hours: timesheetEntries.reduce((sum, entry) => {
-              const hours = parseFloat(entry.modified_hours) || 0;
-              const overtime = Math.max(0, hours - 9);
-              return sum + overtime;
-            }, 0)
-          }}
-        />
-      </div>
-      <TimesheetTable
-        entries={timesheetEntries}
-        onModifiedHoursChange={handleModifiedHoursChange}
-        onCommentChange={handleCommentChange}
-        onApprove={handleApprove}
-        selectedUser={selectedUser}  // Pass selectedUser to TimesheetTable
-      />
+      ) : (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-4">
+              <TimesheetFilters 
+                users={users}
+                selectedUser={selectedUser}
+                selectedDateRange={dateRange}
+                onFilter={handleFilter}
+                isAdmin={user?.is_admin}
+              />
+            </div>
+            <PDFExportButton
+              employeeDetails={{
+                name: selectedUser?.displayName || '',
+                surname: selectedUser?.surname || '',
+                fullName: `${selectedUser?.displayName || ''} ${selectedUser?.surname || ''}`.trim()
+              }}
+              period={{
+                startDate: dateRange?.start || timesheetEntries[0]?.date,
+                endDate: dateRange?.end || timesheetEntries[timesheetEntries.length - 1]?.date
+              }}
+              entries={timesheetEntries}
+              companyLogo={companyLogo}
+              totals={calculateTotals(entries)}
+            />
+          </div>
+          <TimesheetTable
+            entries={timesheetEntries}
+            onModifiedHoursChange={handleModifiedHoursChange}
+            onCommentChange={handleCommentChange}
+            onApprove={handleApprove}
+            selectedUser={selectedUser}  // Pass selectedUser to TimesheetTable
+          />
+          <Button onClick={finalizeTimesheet}>
+            Finalize Timesheet
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

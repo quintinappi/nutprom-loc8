@@ -15,6 +15,7 @@ import ManageUsers from './pages/ManageUsers';
 import LoadingScreen from './components/LoadingScreen';
 import TabletClock from './pages/TabletClock';
 import TimesheetPage from './pages/TimesheetPage';
+import StoredTimesheets from './pages/StoredTimesheets';
 
 const queryClient = new QueryClient();
 
@@ -121,6 +122,14 @@ const App = () => {
                     element={
                       <RequireAuth adminRequired={true}>
                         <TimesheetPage />
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/stored-timesheets"
+                    element={
+                      <RequireAuth adminRequired={true}>
+                        <StoredTimesheets />
                       </RequireAuth>
                     }
                   />

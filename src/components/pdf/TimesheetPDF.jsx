@@ -18,11 +18,16 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   logoContainer: {
-    width: 200,
+    width: 120,
     height: 60,
     marginRight: 15,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+  },
+  logo: {
+    maxWidth: '100%',
+    maxHeight: '100%',
+    objectFit: 'contain',
   },
   titleContainer: {
     justifyContent: 'center',
@@ -161,6 +166,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#6c757d',
   },
+  signaturePlaceholder: {
+    height: 60,
+    marginBottom: 8,
+    padding: 10,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderStyle: 'dashed',
+    borderRadius: 4,
+  },
+  placeholderText: {
+    color: '#6b7280',
+    fontSize: 12,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
 });
 
 // Helper function to safely format date
@@ -202,7 +223,15 @@ const formatDuration = (duration) => {
   return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
 };
 
-const TimesheetPDF = ({ employeeDetails, period, entries, totals, companyLogo }) => {
+const TimesheetPDF = ({ 
+  employeeDetails, 
+  period, 
+  entries, 
+  totals, 
+  companyLogo, 
+  supervisorSignature,
+  employeeSignature 
+}) => {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -211,12 +240,7 @@ const TimesheetPDF = ({ employeeDetails, period, entries, totals, companyLogo })
             <View style={styles.logoContainer}>
               <Image
                 src={companyLogo}
-                style={{
-                  maxWidth: 300,
-                  maxHeight: 100,
-                  objectFit: 'contain',
-                  backgroundColor: 'transparent'
-                }}
+                style={styles.logo}
               />
             </View>
           )}
@@ -233,7 +257,7 @@ const TimesheetPDF = ({ employeeDetails, period, entries, totals, companyLogo })
           <View style={styles.infoRow}>
             <Text style={styles.label}>Period:</Text>
             <Text style={styles.value}>
-              {safeFormatDate(period?.startDate)} - {safeFormatDate(period?.endDate)}
+              {period?.start || '-'} - {period?.end || '-'}
             </Text>
           </View>
         </View>
@@ -296,15 +320,50 @@ const TimesheetPDF = ({ employeeDetails, period, entries, totals, companyLogo })
 
         <View style={styles.footer}>
           <View style={styles.signatureSection}>
-            <View style={styles.signatureLine} />
-            <Text style={styles.signatureLabel}>Employee Signature</Text>
+            <View>
+              {employeeSignature ? (
+                <Image
+                  src={employeeSignature}
+                  style={{
+                    width: '100%',
+                    height: 60,
+                    objectFit: 'contain',
+                    marginBottom: 8
+                  }}
+                />
+              ) : (
+                <View style={styles.signaturePlaceholder}>
+                  <Text style={styles.placeholderText}>Employee to sign</Text>
+                </View>
+              )}
+              <Text style={styles.signatureLabel}>Employee Signature</Text>
+            </View>
+          </View>
+          <View style={styles.signatureSection}>
+            {supervisorSignature ? (
+              <View>
+                <Image
+                  src={supervisorSignature}
+                  style={{
+                    width: '100%',
+                    height: 100,
+                    objectFit: 'contain',
+                    marginBottom: 10,
+                    marginTop: -20
+                  }}
+                />
+                <Text style={styles.signatureLabel}>Supervisor Signature</Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.signatureLine} />
+                <Text style={styles.signatureLabel}>Supervisor Signature</Text>
+              </>
+            )}
           </View>
           <View style={styles.signatureSection}>
             <View style={styles.signatureLine} />
-            <Text style={styles.signatureLabel}>Supervisor Signature</Text>
-          </View>
-          <View style={styles.signatureSection}>
-            <View style={styles.signatureLine} />
+            <Text style={styles.signatureDate}>{format(new Date(), 'dd/MM/yyyy')}</Text>
             <Text style={styles.signatureLabel}>Date</Text>
           </View>
         </View>
